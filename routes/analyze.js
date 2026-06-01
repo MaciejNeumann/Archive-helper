@@ -44,8 +44,8 @@ const handleAnalyze = async (req, res) => {
     const docsTokenSet = buildDocsTokenSet(cache.pages);
     const docsIndex = buildKeywordIndex(cache.pages, tokenize);
 
-    sendEvent(res, 'phase', { phase: 'keywords', message: 'Extracting post keywords…' });
-    const postKeywords = extractKeywordsForPosts(session.posts);
+    sendEvent(res, 'phase', { phase: 'keywords', message: 'Extracting post keywords (constrained to Dynatrace Docs/Blog vocabulary)…' });
+    const postKeywords = extractKeywordsForPosts(session.posts, 25, { vocab: docsTokenSet });
 
     sendEvent(res, 'phase', { phase: 'scoring', message: 'Scoring posts…', total: session.posts.length });
 

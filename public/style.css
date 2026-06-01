@@ -156,6 +156,7 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
   gap: 8px;
   width: 100%;
 }
+.drop-empty[hidden], .drop-selected[hidden] { display: none; }
 .drop-selected {
   flex-direction: row;
   justify-content: center;

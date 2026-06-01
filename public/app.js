@@ -283,27 +283,30 @@ const renderLatestMatch = (post) => {
   return `<div class="overlap-meta">Latest ${label} page · ${date}</div>`;
 };
 
+const KEYWORD_CAP = 25;
+
 const renderOverlapCell = (post) => {
-  const ratio = post.docOverlapRatio ?? 0;
   const matched = post.docOverlapMatched ?? 0;
-  const total = post.docOverlapTotal ?? 0;
   const verdict = post.docOverlapVerdict || 'neutral';
-  const pct = Math.round(ratio * 100);
+  const densityPct = Math.min(100, Math.round((matched / KEYWORD_CAP) * 100));
   const matchedTerms = (post.docOverlapMatchedTerms || []).slice(0, 3);
   const sampleTerms = matchedTerms.length
-    ? `Matched: ${matchedTerms.map(escapeHtml).join(', ')}${post.docOverlapMatched > matchedTerms.length ? '…' : ''}`
-    : 'No keyword matches';
+    ? `e.g. ${matchedTerms.map(escapeHtml).join(', ')}${matched > matchedTerms.length ? '…' : ''}`
+    : 'No IT-vocab terms in this post';
   const docsCount = post.docMatchedDocsPages ?? 0;
   const blogCount = post.docMatchedBlogPages ?? 0;
+  const countLabel = matched === 0
+    ? '<strong>0</strong> Docs/Blog keywords'
+    : `<strong>${matched}</strong> ${matched === 1 ? 'keyword' : 'keywords'} match Docs/Blog`;
   return `
     <div class="overlap-cell">
       <div>
         <span class="overlap-tag verdict-${verdict}">${overlapVerdictLabel(verdict)}</span>
       </div>
-      <div class="overlap-bar"><span class="verdict-${verdict}" style="width:${pct}%"></span></div>
-      <div class="overlap-meta">
-        <strong>${pct}%</strong> · ${matched}/${total} keywords
+      <div class="overlap-bar" title="Density of Docs/Blog vocabulary in this post (out of ${KEYWORD_CAP} top keyword slots)">
+        <span class="verdict-${verdict}" style="width:${densityPct}%"></span>
       </div>
+      <div class="overlap-meta">${countLabel}</div>
       ${renderSourceCounts(docsCount, blogCount)}
       <div class="overlap-meta">${sampleTerms}</div>
       ${renderLatestMatch(post)}
@@ -326,7 +329,7 @@ const renderResults = () => {
     tr.dataset.idx = post.index;
 
     const reasons = (post.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('');
-    const keywords = (post.keywords || []).slice(0, 4)
+    const keywords = (post.keywords || []).slice(0, 8)
       .map((k) => `<span class="kw-chip">${escapeHtml(k)}</span>`).join('');
 
     tr.innerHTML = `
@@ -376,7 +379,11 @@ const handleSortClick = (e) => {
   if (!th) return;
   const key = th.dataset.sort;
   if (state.sort.key === key) state.sort.dir = state.sort.dir === 'desc' ? 'asc' : 'desc';
-  else { state.sort.key = key; state.sort.dir = key === 'subject' || key === 'author' ? 'asc' : 'desc'; }
+  else {
+    state.sort.key = key;
+    const ascByDefault = key === 'subject' || key === 'author' || key === 'docOverlapMatched';
+    state.sort.dir = ascByDefault ? 'asc' : 'desc';
+  }
   renderResults();
 };
 
