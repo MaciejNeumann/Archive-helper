@@ -191,7 +191,7 @@ const handleSseEvent = async (event, payload, logPhase) => {
     if (payload.total > 0) {
       const pct = Math.min(40, Math.round((payload.done / payload.total) * 40));
       $('#progressBar').style.width = `${5 + pct}%`;
-      $('#progressDetail').textContent = `Crawling Docs/Blog · ${payload.done}/${payload.total}`;
+      $('#progressDetail').textContent = `Crawling docs.dynatrace.com + Dynatrace Blog · ${payload.done}/${payload.total}`;
     }
   } else if (event === 'progress') {
     const pct = 50 + Math.round((payload.done / payload.total) * 45);
@@ -199,7 +199,10 @@ const handleSseEvent = async (event, payload, logPhase) => {
     $('#progressDetail').textContent = `Scoring ${payload.done} / ${payload.total} posts`;
   } else if (event === 'done') {
     $('#progressBar').style.width = '100%';
-    $('#progressDetail').textContent = `Done. ${payload.total} posts scored against ${payload.docsPages} Docs/Blog pages.`;
+    const docs = payload.docsPages ?? 0;
+    const blog = payload.blogPages ?? 0;
+    $('#progressDetail').textContent =
+      `Done. ${payload.total} posts scored against ${docs} Docs pages + ${blog} Blog posts.`;
     await loadResults(payload.sessionId);
   } else if (event === 'error') {
     showToast(payload.message, true);
@@ -257,6 +260,29 @@ const overlapVerdictLabel = (verdict) => {
   return 'Partial match';
 };
 
+const sourceLabel = (src) => (src === 'blog' ? 'Blog' : 'Docs');
+
+const renderSourceCounts = (docsCount, blogCount) => {
+  if (!docsCount && !blogCount) return '';
+  const parts = [];
+  parts.push(`<span class="source-chip source-docs" title="Matches on docs.dynatrace.com">📘 ${docsCount} Docs</span>`);
+  parts.push(`<span class="source-chip source-blog" title="Matches on the Dynatrace Blog">📰 ${blogCount} Blog</span>`);
+  return `<div class="overlap-sources">${parts.join('')}</div>`;
+};
+
+const renderLatestMatch = (post) => {
+  if (!post.docLatestMatchAt) return '<div class="overlap-meta">No matches in Docs or Blog</div>';
+  const src = post.docLatestMatchSource || 'docs';
+  const label = sourceLabel(src);
+  const date = formatDate(post.docLatestMatchAt);
+  if (post.docLatestMatchUrl) {
+    return `<div class="overlap-meta">
+      Latest <a class="source-link source-${src}" href="${escapeHtml(post.docLatestMatchUrl)}" target="_blank" rel="noopener" title="${escapeHtml(post.docLatestMatchUrl)}">${label}</a> page · ${date}
+    </div>`;
+  }
+  return `<div class="overlap-meta">Latest ${label} page · ${date}</div>`;
+};
+
 const renderOverlapCell = (post) => {
   const ratio = post.docOverlapRatio ?? 0;
   const matched = post.docOverlapMatched ?? 0;
@@ -264,12 +290,11 @@ const renderOverlapCell = (post) => {
   const verdict = post.docOverlapVerdict || 'neutral';
   const pct = Math.round(ratio * 100);
   const matchedTerms = (post.docOverlapMatchedTerms || []).slice(0, 3);
-  const latestStr = post.docLatestMatchAt
-    ? `Latest matching doc: ${formatDate(post.docLatestMatchAt)}`
-    : 'No matching docs found';
   const sampleTerms = matchedTerms.length
     ? `Matched: ${matchedTerms.map(escapeHtml).join(', ')}${post.docOverlapMatched > matchedTerms.length ? '…' : ''}`
     : 'No keyword matches';
+  const docsCount = post.docMatchedDocsPages ?? 0;
+  const blogCount = post.docMatchedBlogPages ?? 0;
   return `
     <div class="overlap-cell">
       <div>
@@ -279,8 +304,9 @@ const renderOverlapCell = (post) => {
       <div class="overlap-meta">
         <strong>${pct}%</strong> · ${matched}/${total} keywords
       </div>
+      ${renderSourceCounts(docsCount, blogCount)}
       <div class="overlap-meta">${sampleTerms}</div>
-      <div class="overlap-meta">${latestStr}</div>
+      ${renderLatestMatch(post)}
     </div>
   `;
 };

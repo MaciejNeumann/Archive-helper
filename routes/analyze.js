@@ -75,10 +75,14 @@ const handleAnalyze = async (req, res) => {
     session.docsCacheVersion = new Date(cache.fetchedAt).toISOString();
     saveSession(session);
 
+    const blogPagesCount = cache.pages.filter((p) => p.url && p.url.includes('/news/blog/')).length;
+    const docsPagesCount = cache.pageCount - blogPagesCount;
     sendEvent(res, 'done', {
       sessionId: session.id,
       total: session.posts.length,
-      docsPages: cache.pageCount,
+      docsPages: docsPagesCount,
+      blogPages: blogPagesCount,
+      totalSourcePages: cache.pageCount,
     });
     res.end();
   } catch (err) {

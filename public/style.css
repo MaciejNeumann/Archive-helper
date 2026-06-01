@@ -353,6 +353,29 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
 .overlap-tag.verdict-neutral { background: #eee7fb; color: var(--dt-purple-dark); }
 .overlap-tag.verdict-active  { background: #e0f5ec; color: #1d7c5a; }
 
+.overlap-sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 1px; }
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.source-chip.source-docs { background: #e3f0ff; color: var(--dt-blue-dark); border: 1px solid #c8def8; }
+.source-chip.source-blog { background: #f3ecff; color: var(--dt-purple-dark); border: 1px solid #ddcef5; }
+.source-link {
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px dotted;
+}
+.source-link.source-docs { color: var(--dt-blue-dark); }
+.source-link.source-blog { color: var(--dt-purple-dark); }
+.source-link:hover { text-decoration: underline; }
+
 .stars { display: inline-flex; gap: 1px; }
 .star {
   width: 13px; height: 13px;
