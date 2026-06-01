@@ -1,21 +1,28 @@
 ## Project purpose
-We want to build a project, that will help with archiving content in the Dynatrace Community. After uploading CSV file (with community posts), the Archive helper will evaluate if the content in the posts is still up to date, or if it should be archived. The content will be checked against the Dynatrace Documentation and Dynatrace Blog if it is still valid in the currect year, then through the couple of other rules (like if the user is still active in the Community, or if there is any interaction under the post) and scored from 1 to 5 stars - 5 stars meaning that there is high possibility that this should be archived, 1 for low.
+A tool that helps archive stale content in the Dynatrace Community. The user uploads a CSV export of community posts; the Archive helper checks each post against the Dynatrace Documentation and Dynatrace Blog and against age/interaction rules, then scores each from 1 to 5 stars — 5 = strong candidate for archiving, 1 = keep.
 
 ## Product features
-1. Ability to upload 2 CSV files - one with Community content, second with the user data
-2. Then, after pressing a button, the Archive helper will check the content against the Dynatrace Documentation (https://docs.dynatrace.com/docs) and Dynatrace blog (https://www.dynatrace.com/news/blog/). If the content appears outdated, give it higher score for archiving. Do this check in the most efficient matter possible.
-3. Then it will check against these rules:
-    a. How old is the posts? If it is older than 3 years, this increases the possibility of archiving
-    b. Are any comments under the post, and the post is older than a year? If not, this increases the possibility of archiving
-    c. Are there any kudos for this post, and the post is older than a year? If not, this increases the possibility of archiving
-4. After this check, show the results in the table. The best candidates for archiving should be at the top, the worst one at the bottom
-5. If possible, add in the table the reason, why this particular posts is a good candidate for archiving
-6. Remember to add link to the post in the table, so it will be easy to check it out
-7. Add a column called "checked" with ability to add a checkmark if the post was checked by the real user
-8. Give Archive helper ability to save a session and restore it
+1. Upload a **single CSV file** with Dynatrace Community posts (UTF-16 LE, tab-separated, with a 3-line metadata preamble before the header).
+2. On "Analyze", the Archive helper checks each post against Dynatrace Documentation (https://docs.dynatrace.com/docs) and Dynatrace Blog (https://www.dynatrace.com/news/blog/). If a post's topic is missing from current docs/blog or only matches stale pages, its archive score increases.
+3. Rule-based signals on top of the doc check:
+    a. Post older than 3 years → increases archive score.
+    b. Post older than 1 year **and** no comments → increases archive score.
+    c. Post older than 1 year **and** no kudos → increases archive score.
+    d. Body mentions deprecated Dynatrace terms (AppMon, Ruxit, dynaTrace 6/7, classic UI, …) → increases archive score.
+4. Results render in a sortable table; the strongest archive candidates (5★) sit at the top, weakest (1★) at the bottom.
+5. Each row shows a human-readable "Why" — the list of signals that contributed to its score.
+6. Each row links directly to the original community post URL.
+7. A "Checked" column with a checkbox so a real reviewer can mark posts they've inspected.
+8. Sessions can be saved to disk and restored later; checkmark state persists with the session.
 
 ## Backend
-1. Node.js as a basis for everything, rest is up to you
+1. Node.js + Express, single process, serves both the API and a static vanilla-JS frontend.
+2. **No LLM / no Claude API** — outdatedness signal is computed from a cached crawl of `docs.dynatrace.com` and `dynatrace.com/news/blog`, keyword overlap, last-modified freshness, and a curated deprecated-terms list.
+3. Persistent state: `./cache/` for the docs crawl (gzip JSON, 7-day TTL), `./sessions/` for saved analyses (one JSON file per session).
+4. Progress reporting uses Server-Sent Events from `/api/analyze/:id` so the frontend can show a live progress bar across 500–5,000 posts.
+5. Dependencies: `express`, `multer`, `iconv-lite`, `papaparse`, `cheerio`, `p-limit`, `uuid`. No frontend framework.
+
+See [PLAN.md](./PLAN.md) for the full implementation plan, file layout, and scoring model.
 
 ## Style
 1. Use dynatrace.com and community.dynatrace.com as insipration for the frontend - similar colors, button, and so on

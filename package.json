@@ -1,0 +1,24 @@
+{
+  "name": "archive-helper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Score Dynatrace Community posts for archive-worthiness against Docs + Blog + age/interaction signals.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "express": "^4.21.2",
+    "iconv-lite": "^0.6.3",
+    "multer": "^1.4.5-lts.1",
+    "p-limit": "^3.1.0",
+    "papaparse": "^5.4.1",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

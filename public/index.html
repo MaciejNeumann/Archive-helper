@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Archive Helper · Dynatrace Community</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header class="top-bar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-text">Archive&nbsp;Helper</span>
+    <span class="brand-sub">Dynatrace Community</span>
+  </div>
+  <nav class="top-actions">
+    <button id="loadSessionBtn" class="ghost-btn">Sessions</button>
+    <button id="refreshCacheBtn" class="ghost-btn" title="Refresh the cached crawl of Docs &amp; Blog">Refresh docs cache</button>
+  </nav>
+</header>
+
+<main>
+  <section id="uploadSection" class="card upload-card">
+    <h1>Score posts for archiving</h1>
+    <p class="lede">
+      Upload a Dynatrace Community CSV export. Each post is scored from <strong>1&nbsp;★</strong> (keep) to
+      <strong>5&nbsp;★</strong> (strong archive candidate) based on its age, interaction, mentions of deprecated
+      tech, and how well the topic matches current Docs &amp; Blog content.
+    </p>
+    <form id="uploadForm" class="upload-form">
+      <label class="drop-zone" id="dropZone">
+        <input type="file" id="csvFile" name="csv" accept=".csv,.tsv,text/csv,text/tab-separated-values" hidden />
+        <div class="drop-empty">
+          <span class="drop-icon">⬆</span>
+          <span class="drop-title">Drop your CSV here or click to browse</span>
+          <span class="drop-sub">UTF-16 tab-separated export from Community search · up to 50&nbsp;MB</span>
+        </div>
+        <div class="drop-selected" hidden>
+          <span class="drop-check" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 7"/></svg>
+          </span>
+          <div class="drop-meta">
+            <span class="drop-filename" id="dropFilename"></span>
+            <span class="drop-filesize" id="dropFilesize"></span>
+          </div>
+          <button type="button" class="drop-remove" id="dropRemove" aria-label="Remove file">×</button>
+        </div>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" id="includeReplies" />
+        <span>Also score reply messages (default: original threads only)</span>
+      </label>
+      <button type="submit" id="uploadBtn" class="primary-btn" disabled>Upload &amp; parse</button>
+    </form>
+  </section>
+
+  <section id="progressSection" class="card progress-card" hidden>
+    <h2 id="progressTitle">Analyzing…</h2>
+    <p id="progressDetail" class="muted">Starting…</p>
+    <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+    <ul id="phaseLog" class="phase-log"></ul>
+  </section>
+
+  <section id="resultsSection" class="card results-card" hidden>
+    <header class="results-header">
+      <div>
+        <h2 id="resultsTitle">Results</h2>
+        <p class="muted" id="resultsSummary"></p>
+      </div>
+      <div class="results-actions">
+        <input id="searchBox" class="search" type="search" placeholder="Filter by subject, author, keyword…" />
+        <select id="starFilter" class="select">
+          <option value="0">All stars</option>
+          <option value="5">5★ only</option>
+          <option value="4">4★ and up</option>
+          <option value="3">3★ and up</option>
+          <option value="2">2★ and up</option>
+        </select>
+        <button id="saveSessionBtn" class="primary-btn">Save session</button>
+      </div>
+    </header>
+    <div class="table-wrap">
+      <table id="resultsTable" class="results-table">
+        <thead>
+          <tr>
+            <th class="col-checked">✓</th>
+            <th class="col-stars sortable" data-sort="stars">Score</th>
+            <th class="col-subject sortable" data-sort="subject">Post</th>
+            <th class="col-author sortable" data-sort="author">Author</th>
+            <th class="col-date sortable" data-sort="postedAt">Posted</th>
+            <th class="col-num sortable" data-sort="replies">Replies</th>
+            <th class="col-num sortable" data-sort="kudos">Kudos</th>
+            <th class="col-overlap sortable" data-sort="docOverlapRatio">Docs / Blog overlap</th>
+            <th class="col-why">Why this score</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTbody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="sessionsDialog" class="sessions-dialog">
+  <h3>Saved sessions</h3>
+  <ul id="sessionsList" class="sessions-list"></ul>
+  <form method="dialog"><button class="ghost-btn">Close</button></form>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
