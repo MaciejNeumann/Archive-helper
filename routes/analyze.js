@@ -1,5 +1,5 @@
 const express = require('express');
-const { loadSession, saveSession } = require('../lib/session-store');
+const { loadSession, saveSession, isValidSessionId } = require('../lib/session-store');
 const { ensureDocsCache, buildKeywordIndex } = require('../lib/docs-crawler');
 const { extractKeywordsForPosts, tokenize } = require('../lib/keyword-extract');
 const { scorePost, buildDocsTokenSet } = require('../lib/scorer');
@@ -22,6 +22,9 @@ const sendEvent = (res, event, data) => {
 };
 
 const handleAnalyze = async (req, res) => {
+  if (!isValidSessionId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid session id' });
+  }
   const session = loadSession(req.params.id);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
@@ -45,7 +48,7 @@ const handleAnalyze = async (req, res) => {
     const docsIndex = buildKeywordIndex(cache.pages, tokenize);
 
     sendEvent(res, 'phase', { phase: 'keywords', message: 'Extracting post keywords (constrained to Dynatrace Docs/Blog vocabulary)…' });
-    const postKeywords = extractKeywordsForPosts(session.posts, 25, { vocab: docsTokenSet });
+    const keywordsByPost = extractKeywordsForPosts(session.posts, 25, { vocab: docsTokenSet });
 
     sendEvent(res, 'phase', { phase: 'scoring', message: 'Scoring posts…', total: session.posts.length });
 
@@ -56,7 +59,7 @@ const handleAnalyze = async (req, res) => {
       const postedAtObj = post.postedAt ? { ...post, postedAt: new Date(post.postedAt) } : post;
       const result = scorePost({
         post: postedAtObj,
-        keywords: postKeywords[i],
+        keywords: keywordsByPost.get(post) || [],
         docsTokenSet,
         docsIndex,
         pages: cache.pages,
@@ -73,7 +76,7 @@ const handleAnalyze = async (req, res) => {
     }
 
     session.docsCacheVersion = new Date(cache.fetchedAt).toISOString();
-    saveSession(session);
+    await saveSession(session);
 
     const blogPagesCount = cache.pages.filter((p) => p.url && p.url.includes('/news/blog/')).length;
     const docsPagesCount = cache.pageCount - blogPagesCount;

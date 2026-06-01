@@ -106,7 +106,10 @@
 <dialog id="sessionsDialog" class="sessions-dialog">
   <h3>Saved sessions</h3>
   <ul id="sessionsList" class="sessions-list"></ul>
-  <form method="dialog"><button class="ghost-btn">Close</button></form>
+  <div class="sessions-dialog-actions">
+    <button type="button" id="clearAllSessionsBtn" class="ghost-btn danger" hidden>Clear all</button>
+    <form method="dialog"><button class="ghost-btn">Close</button></form>
+  </div>
 </dialog>
 
 <script src="/app.js"></script>

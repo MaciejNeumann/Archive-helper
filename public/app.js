@@ -270,9 +270,11 @@ const renderSourceCounts = (docsCount, blogCount) => {
   return `<div class="overlap-sources">${parts.join('')}</div>`;
 };
 
+const ALLOWED_SOURCES = new Set(['docs', 'blog']);
+
 const renderLatestMatch = (post) => {
   if (!post.docLatestMatchAt) return '<div class="overlap-meta">No matches in Docs or Blog</div>';
-  const src = post.docLatestMatchSource || 'docs';
+  const src = ALLOWED_SOURCES.has(post.docLatestMatchSource) ? post.docLatestMatchSource : 'docs';
   const label = sourceLabel(src);
   const date = formatDate(post.docLatestMatchAt);
   if (post.docLatestMatchUrl) {
@@ -439,7 +441,20 @@ const openSessionsDialog = async () => {
     `;
     ul.appendChild(li);
   }
+  $('#clearAllSessionsBtn').hidden = sessions.length === 0;
   $('#sessionsDialog').showModal();
+};
+
+const handleClearAllSessions = async () => {
+  if (!confirm('Delete ALL saved sessions? This cannot be undone.')) return;
+  const r = await fetch('/api/sessions', { method: 'DELETE' });
+  if (r.ok) {
+    const { deleted } = await r.json();
+    showToast(`Cleared ${deleted} session${deleted === 1 ? '' : 's'}`);
+    openSessionsDialog();
+  } else {
+    showToast('Failed to clear sessions', true);
+  }
 };
 
 const handleSessionsClick = async (e) => {
@@ -486,6 +501,7 @@ const init = () => {
   $('#starFilter').addEventListener('change', handleStarFilter);
   $('#loadSessionBtn').addEventListener('click', openSessionsDialog);
   $('#sessionsList').addEventListener('click', handleSessionsClick);
+  $('#clearAllSessionsBtn').addEventListener('click', handleClearAllSessions);
   $('#saveSessionBtn').addEventListener('click', handleSaveSession);
   $('#refreshCacheBtn').addEventListener('click', handleRefreshCache);
 };

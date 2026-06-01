@@ -447,6 +447,13 @@ input.checked-box { transition: transform 0.12s ease; }
 .session-actions { display: flex; gap: 6px; }
 .session-actions .ghost-btn { padding: 6px 10px; font-size: 12px; }
 .session-actions .danger { color: var(--dt-red); border-color: #f7c6cd; }
+.sessions-dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+.sessions-dialog-actions .danger { color: var(--dt-red); border-color: #f7c6cd; }
 
 .toast {
   position: fixed;
