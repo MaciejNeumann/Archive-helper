@@ -408,12 +408,24 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
 }
 .post-keywords { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
 .kw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: #eef5ff;
   color: var(--dt-blue-dark);
   padding: 1px 7px;
   border-radius: 999px;
   font-size: 10.5px;
   white-space: nowrap;
+}
+.kw-score {
+  background: rgba(0,80,180,0.12);
+  border-radius: 999px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
 }
 .why-list { margin: 0; padding-left: 16px; font-size: 11.5px; line-height: 1.4; }
 .why-list li { margin: 0 0 3px; }

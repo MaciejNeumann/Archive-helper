@@ -48,7 +48,11 @@ const handleAnalyze = async (req, res) => {
     const docsIndex = buildKeywordIndex(cache.pages, tokenize);
 
     sendEvent(res, 'phase', { phase: 'keywords', message: 'Extracting post keywords (constrained to Dynatrace Docs/Blog vocabulary)…' });
-    const keywordsByPost = extractKeywordsForPosts(session.posts, 25, { vocab: docsTokenSet });
+    const keywordsByPost = extractKeywordsForPosts(session.posts, 25, {
+      vocab: docsTokenSet,
+      docsIndex,
+      totalDocsPages: cache.pages.length,
+    });
 
     sendEvent(res, 'phase', { phase: 'scoring', message: 'Scoring posts…', total: session.posts.length });
 
@@ -57,9 +61,10 @@ const handleAnalyze = async (req, res) => {
       if (clientClosed) return;
       const post = session.posts[i];
       const postedAtObj = post.postedAt ? { ...post, postedAt: new Date(post.postedAt) } : post;
+      const kw = keywordsByPost.get(post) || { terms: [], scores: {} };
       const result = scorePost({
         post: postedAtObj,
-        keywords: keywordsByPost.get(post) || [],
+        keywords: kw.terms,
         docsTokenSet,
         docsIndex,
         pages: cache.pages,
@@ -68,6 +73,7 @@ const handleAnalyze = async (req, res) => {
       session.posts[i] = {
         ...post,
         ...result,
+        keywordScores: kw.scores,
         analyzed: true,
       };
       if ((i + 1) % 25 === 0 || i === session.posts.length - 1) {

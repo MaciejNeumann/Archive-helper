@@ -221,6 +221,7 @@ const loadResults = async (sessionId) => {
   state.posts = data.posts;
   $('#progressSection').hidden = true;
   $('#resultsSection').hidden = false;
+  $('#newCsvBtn').hidden = false;
   $('#resultsTitle').textContent = `Results · ${data.sourceFile || ''}`;
   renderResults();
 };
@@ -331,8 +332,13 @@ const renderResults = () => {
     tr.dataset.idx = post.index;
 
     const reasons = (post.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('');
+    const kwScores = post.keywordScores || {};
     const keywords = (post.keywords || []).slice(0, 8)
-      .map((k) => `<span class="kw-chip">${escapeHtml(k)}</span>`).join('');
+      .map((k) => {
+        const s = kwScores[k];
+        const badge = s != null ? `<span class="kw-score">${s}</span>` : '';
+        return `<span class="kw-chip">${escapeHtml(k)}${badge}</span>`;
+      }).join('');
 
     tr.innerHTML = `
       <td class="col-checked">
@@ -482,6 +488,14 @@ const handleSaveSession = async () => {
   if (r.ok) showToast('Session saved'); else showToast('Save failed', true);
 };
 
+const handleNewCsv = () => {
+  handleFileCleared();
+  $('#resultsSection').hidden = true;
+  $('#progressSection').hidden = true;
+  $('#uploadSection').hidden = false;
+  $('#newCsvBtn').hidden = true;
+};
+
 const handleRefreshCache = async () => {
   if (!state.sessionId) {
     showToast('Upload a CSV first, then refresh.', true);
@@ -499,6 +513,7 @@ const init = () => {
   $('#resultsTbody').addEventListener('change', handleCheckboxToggle);
   $('#searchBox').addEventListener('input', handleSearch);
   $('#starFilter').addEventListener('change', handleStarFilter);
+  $('#newCsvBtn').addEventListener('click', handleNewCsv);
   $('#loadSessionBtn').addEventListener('click', openSessionsDialog);
   $('#sessionsList').addEventListener('click', handleSessionsClick);
   $('#clearAllSessionsBtn').addEventListener('click', handleClearAllSessions);
