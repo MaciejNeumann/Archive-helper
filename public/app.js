@@ -219,6 +219,7 @@ const loadResults = async (sessionId) => {
   const data = await r.json();
   state.sessionId = data.id;
   state.posts = data.posts;
+  state.sourceFile = data.sourceFile || '';
   $('#progressSection').hidden = true;
   $('#resultsSection').hidden = false;
   $('#newCsvBtn').hidden = false;
@@ -317,6 +318,26 @@ const renderOverlapCell = (post) => {
   `;
 };
 
+const LLM_VERDICT_LABEL = { archive: 'Archive', keep: 'Keep', review: 'Needs review' };
+
+const renderLlmCell = (post) => {
+  if (!post.llmVerdict) return '<span class="muted">—</span>';
+  const verdict = post.llmVerdict;
+  const label = LLM_VERDICT_LABEL[verdict] || verdict;
+  const conf = typeof post.llmConfidence === 'number'
+    ? `<span class="llm-conf">${Math.round(post.llmConfidence * 100)}%</span>`
+    : '';
+  const summary = post.llmSummary
+    ? `<div class="llm-summary" title="${escapeHtml(post.llmReasoning || '')}">${escapeHtml(shorten(post.llmSummary, 160))}</div>`
+    : '';
+  return `
+    <div class="llm-cell">
+      <span class="llm-tag llm-${verdict}">${label}</span>${conf}
+      ${summary}
+    </div>
+  `;
+};
+
 const renderResults = () => {
   const rows = filteredSortedPosts();
   const totalChecked = state.posts.filter((p) => p.checked).length;
@@ -365,6 +386,7 @@ const renderResults = () => {
       <td class="col-why">
         ${reasons ? `<ul class="why-list">${reasons}</ul>` : '<span class="muted">No archive signals.</span>'}
       </td>
+      <td class="col-llm">${renderLlmCell(post)}</td>
     `;
     frag.appendChild(tr);
   }
@@ -422,6 +444,154 @@ const handleSearch = () => {
 const handleStarFilter = () => {
   state.filter.minStars = parseInt($('#starFilter').value, 10) || 0;
   renderResults();
+};
+
+// ------------------------- Export / Import -------------------------
+const EXPORT_COLUMNS = [
+  ['index', (p) => p.index],
+  ['stars', (p) => p.stars ?? ''],
+  ['rawScore', (p) => p.rawScore ?? ''],
+  ['subject', (p) => p.subject || ''],
+  ['author', (p) => p.author || ''],
+  ['postedAt', (p) => p.postedAt || ''],
+  ['replies', (p) => p.replies ?? ''],
+  ['kudos', (p) => p.kudos ?? ''],
+  ['url', (p) => p.url || ''],
+  ['docOverlapVerdict', (p) => p.docOverlapVerdict || ''],
+  ['docOverlapMatched', (p) => p.docOverlapMatched ?? ''],
+  ['keywords', (p) => (p.keywords || []).join('; ')],
+  ['matchedTerms', (p) => (p.docOverlapMatchedTerms || []).join('; ')],
+  ['docLatestMatchUrl', (p) => p.docLatestMatchUrl || ''],
+  ['docLatestMatchAt', (p) => p.docLatestMatchAt || ''],
+  ['docLatestMatchSource', (p) => p.docLatestMatchSource || ''],
+  ['reasons', (p) => (p.reasons || []).join(' | ')],
+  ['checked', (p) => (p.checked ? 'yes' : 'no')],
+  ['llmVerdict', (p) => p.llmVerdict || ''],
+  ['llmConfidence', (p) => (typeof p.llmConfidence === 'number' ? p.llmConfidence : '')],
+  ['llmSummary', (p) => p.llmSummary || ''],
+  ['body', (p) => p.body || ''],
+];
+
+const csvField = (value) => {
+  const s = String(value ?? '');
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+const buildCsv = (posts) => {
+  const header = EXPORT_COLUMNS.map(([name]) => name).join(',');
+  const rows = posts.map((p) => EXPORT_COLUMNS.map(([, get]) => csvField(get(p))).join(','));
+  // Prepend a UTF-8 BOM so Excel opens it with the right encoding.
+  return `﻿${[header, ...rows].join('\r\n')}`;
+};
+
+const buildJson = (posts, scope) => JSON.stringify({
+  meta: {
+    sessionId: state.sessionId,
+    sourceFile: state.sourceFile,
+    exportedAt: new Date().toISOString(),
+    scope,
+    count: posts.length,
+  },
+  posts: posts.map((p) => ({
+    index: p.index,
+    subject: p.subject || '',
+    body: p.body || '',
+    url: p.url || '',
+    author: p.author || '',
+    postedAt: p.postedAt || null,
+    replies: p.replies ?? 0,
+    kudos: p.kudos ?? 0,
+    stars: p.stars ?? null,
+    rawScore: p.rawScore ?? null,
+    reasons: p.reasons || [],
+    keywords: p.keywords || [],
+    docOverlapVerdict: p.docOverlapVerdict || null,
+    docOverlapMatched: p.docOverlapMatched ?? null,
+    docOverlapMatchedTerms: p.docOverlapMatchedTerms || [],
+    docLatestMatchUrl: p.docLatestMatchUrl || null,
+    docLatestMatchAt: p.docLatestMatchAt || null,
+    docLatestMatchSource: p.docLatestMatchSource || null,
+    checked: !!p.checked,
+  })),
+}, null, 2);
+
+const gatherExportPosts = (scope) => {
+  if (scope === 'view') return filteredSortedPosts();
+  const analyzed = state.posts.filter((p) => p.analyzed);
+  if (scope === 'unchecked') return analyzed.filter((p) => !p.checked);
+  return analyzed;
+};
+
+const downloadBlob = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const exportBaseName = (scope) => {
+  const base = (state.sourceFile || 'archive-helper').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '_');
+  const stamp = new Date().toISOString().slice(0, 10);
+  return `${base}_${scope}_${stamp}`;
+};
+
+const selectedExportScope = () =>
+  ($('input[name="exportScope"]:checked') || {}).value || 'all';
+
+const updateExportCount = () => {
+  const n = gatherExportPosts(selectedExportScope()).length;
+  $('#exportCount').textContent = `${n} post${n === 1 ? '' : 's'} will be exported.`;
+};
+
+const openExportDialog = () => {
+  updateExportCount();
+  $('#exportDialog').showModal();
+};
+
+const handleExportConfirm = () => {
+  const scope = selectedExportScope();
+  const posts = gatherExportPosts(scope);
+  if (posts.length === 0) {
+    showToast('Nothing to export for this scope.', true);
+    return;
+  }
+  const base = exportBaseName(scope);
+  downloadBlob(buildCsv(posts), `${base}.csv`, 'text/csv;charset=utf-8');
+  // Small delay so the browser doesn't drop the second programmatic download.
+  setTimeout(() => downloadBlob(buildJson(posts, scope), `${base}.json`, 'application/json'), 300);
+  $('#exportDialog').close();
+  showToast(`Exported ${posts.length} posts (CSV + JSON)`);
+};
+
+const handleImportLlm = () => $('#llmImportFile').click();
+
+const handleLlmFileChosen = async (e) => {
+  const file = e.target.files[0];
+  if (!file || !state.sessionId) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const results = Array.isArray(parsed) ? parsed : parsed.results;
+    if (!Array.isArray(results)) throw new Error('File must be an array or { results: [...] }');
+    const r = await fetch(`/api/sessions/${state.sessionId}/llm-import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ results }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Import failed');
+    showToast(`Imported ${data.matched} LLM verdict${data.matched === 1 ? '' : 's'}${data.skipped ? ` · ${data.skipped} skipped` : ''}`);
+    await loadResults(state.sessionId);
+  } catch (err) {
+    showToast(`Import failed: ${err.message}`, true);
+  } finally {
+    e.target.value = '';
+  }
 };
 
 // ------------------------- Sessions -------------------------
@@ -519,6 +689,11 @@ const init = () => {
   $('#clearAllSessionsBtn').addEventListener('click', handleClearAllSessions);
   $('#saveSessionBtn').addEventListener('click', handleSaveSession);
   $('#refreshCacheBtn').addEventListener('click', handleRefreshCache);
+  $('#exportBtn').addEventListener('click', openExportDialog);
+  $('#exportConfirmBtn').addEventListener('click', handleExportConfirm);
+  $('#exportDialog').addEventListener('change', updateExportCount);
+  $('#importLlmBtn').addEventListener('click', handleImportLlm);
+  $('#llmImportFile').addEventListener('change', handleLlmFileChosen);
 };
 
 init();

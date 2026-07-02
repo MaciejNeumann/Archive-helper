@@ -45,6 +45,23 @@ Star mapping: raw score 0–1 → 1★, 2 → 2★, 3 → 3★, 4 → 4★, ≥ 
 - **Author / Posted / Replies / Kudos** — sortable; zero values in Replies and Kudos highlighted red
 - **Docs & Blog overlap** — verdict tag, ratio bar, matched keyword count, per-source page counts (📘 Docs / 📰 Blog), and a link to the most relevant matched page
 - **Why this score** — plain-language list of every signal that contributed
+- **LLM review** — empty until you import an LLM review file (see below); shows the model's keep/archive verdict, confidence, and a one-line summary alongside the rule-based score
+
+## Export & LLM review
+
+The rule-based score is a fast first pass. To refine it with real content understanding, hand the
+results to an LLM and bring its verdicts back in:
+
+1. In the results view, click **Export** and pick a scope (all analyzed posts, the current filtered
+   view, or only unchecked posts). You get two files: a **CSV** (full data incl. post body, for
+   spreadsheets) and a **JSON** (clean schema, for the skill).
+2. Give the exported JSON to Claude Code and invoke the **`analyze-post-context`** skill
+   (`.claude/skills/analyze-post-context/`). It reads each post's body, produces an independent
+   keep/archive verdict with confidence + reasoning, writes a prioritized markdown review report,
+   and emits a re-importable `*.llm-review.json`.
+3. Back in the app, click **Import LLM review** and select that JSON. Verdicts are matched to posts
+   by index, persisted to the session, and shown in the **LLM review** column — so you can spot
+   where the LLM disagrees with the rule-based stars.
 
 ## Sessions
 
@@ -60,7 +77,7 @@ archive-helper/
 ├── routes/
 │   ├── upload.js           # POST /api/upload
 │   ├── analyze.js          # GET /api/analyze/:id  (Server-Sent Events)
-│   ├── sessions.js         # GET/POST/DELETE /api/sessions
+│   ├── sessions.js         # GET/POST/DELETE /api/sessions, POST /api/sessions/:id/llm-import
 │   └── checked.js          # PATCH /api/sessions/:id/checked
 ├── lib/
 │   ├── csv-parser.js       # UTF-16 decode, skip preamble, TSV parse

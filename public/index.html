@@ -80,6 +80,9 @@
           <option value="3">3★ and up</option>
           <option value="2">2★ and up</option>
         </select>
+        <button id="exportBtn" class="ghost-btn" title="Export results as CSV + JSON for LLM analysis">Export</button>
+        <button id="importLlmBtn" class="ghost-btn" title="Import an LLM review file to overlay verdicts">Import LLM review</button>
+        <input type="file" id="llmImportFile" accept=".json,application/json" hidden />
         <button id="saveSessionBtn" class="primary-btn">Save session</button>
       </div>
     </header>
@@ -96,6 +99,7 @@
             <th class="col-num sortable" data-sort="kudos">Kudos</th>
             <th class="col-overlap sortable" data-sort="docOverlapMatched" title="Number of post keywords found in docs.dynatrace.com or the Dynatrace Blog (ascending: Missing first, then thinnest matches)">Docs &amp; Blog overlap</th>
             <th class="col-why">Why this score</th>
+            <th class="col-llm sortable" data-sort="llmVerdict" title="LLM review verdict, imported from the analyze-post-context skill">LLM review</th>
           </tr>
         </thead>
         <tbody id="resultsTbody"></tbody>
@@ -103,6 +107,21 @@
     </div>
   </section>
 </main>
+
+<dialog id="exportDialog" class="sessions-dialog export-dialog">
+  <h3>Export results</h3>
+  <p class="muted">Downloads a <strong>CSV</strong> (for spreadsheets) and a <strong>JSON</strong> (for the <code>analyze-post-context</code> skill). Pick which posts to include:</p>
+  <fieldset class="export-scope">
+    <label><input type="radio" name="exportScope" value="all" checked /> <span>All analyzed posts</span></label>
+    <label><input type="radio" name="exportScope" value="view" /> <span>Current filtered view</span></label>
+    <label><input type="radio" name="exportScope" value="unchecked" /> <span>Only unchecked posts</span></label>
+  </fieldset>
+  <p class="muted export-count" id="exportCount"></p>
+  <div class="sessions-dialog-actions">
+    <button type="button" id="exportConfirmBtn" class="primary-btn">Download CSV + JSON</button>
+    <form method="dialog"><button class="ghost-btn">Cancel</button></form>
+  </div>
+</dialog>
 
 <dialog id="sessionsDialog" class="sessions-dialog">
   <h3>Saved sessions</h3>

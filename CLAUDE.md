@@ -19,6 +19,9 @@ A tool that helps archive stale content in the Dynatrace Community. The user upl
 9. A "Checked" column with a checkbox so a real reviewer can mark posts they've inspected.
 10. The upload area gives clear visual feedback when a CSV is selected — animated green check, filename + size, one-click remove button.
 11. Sessions can be saved to disk and restored later; checkmark state persists with the session.
+12. **Export** results for external LLM analysis: an "Export" button opens a scope dialog (all analyzed / current filtered view / unchecked only) and downloads two files client-side — a **CSV** (full data incl. full post body, UTF-8 BOM for Excel) and a **JSON** (clean schema with `meta` + `posts[]`, keyed by stable post `index`). The JSON is the format the `analyze-post-context` skill consumes.
+13. **Import LLM review**: an "Import LLM review" button loads a `*.llm-review.json` (produced by the `analyze-post-context` skill), POSTs it to `/api/sessions/:id/llm-import`, which merges each result onto its post by `index` and persists it. A new **LLM review** column then shows the model's verdict (`archive`/`keep`/`review`), confidence %, and one-line summary (full reasoning on hover) — for spotting where the LLM disagrees with the rule-based stars.
+14. **Skill `analyze-post-context`** (`.claude/skills/analyze-post-context/`): the round-trip companion run in Claude Code, not in the web app. It reads an Archive Helper export, reads each post body to form an independent keep/archive verdict + confidence + reasoning, writes a prioritized markdown review report, and emits the re-importable `*.llm-review.json`.
 
 ## Backend
 1. Node.js + Express, single process, serves both the API and a static vanilla-JS frontend. Start with `npm start` → http://localhost:3000.
