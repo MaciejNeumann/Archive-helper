@@ -42,18 +42,26 @@ match verdicts back to the right post.
 
 Read `subject` + `body` first, then weigh the metadata. Decide one of:
 
-- **`archive`** — content is stale/obsolete, superseded by current docs, about a deprecated
-  product (AppMon, Ruxit, dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic,
-  DaemonSet-based OA install), a one-off question long since resolved with no lasting value, or a
-  duplicate of well-documented material. Strong archive signals: no resolution posted,
-  version-specific errors for EOL versions (OCP 3.x, DT 1.x–1.70, K8s < 1.18), demo-tool issues
-  (easyTravel), basic FAQs fully answered in current docs.
+- **`archive`** — content is stale or incorrect: about a deprecated product (AppMon, Ruxit,
+  dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based OA
+  install), version-specific errors for EOL versions (OCP 3.x, DT 1.x–1.70, K8s < 1.18),
+  a one-off question long since resolved with no lasting value, or demo-tool issues (easyTravel).
+  Strong archive signals: no resolution posted, question is trivially answered by any current
+  search, PCF/CF context.
+
+  **Doc/blog overlap is NOT an archive signal.** A community post on the same topic as docs or
+  a blog post is healthy — different users prefer different knowledge sources. Archive only when
+  the *content itself* is obsolete or incorrect, not because documentation also covers the topic.
+
 - **`keep`** — still useful: a workable how-to or solution pattern, recurring operational challenge
   (certs, network isolation, service mesh, non-privileged containers, multi-cluster scale),
   community-endorsed content (kudos ≥ 1), or an actively discussed thread (replies ≥ 5).
   Age alone is **not** a reason to archive if the content is still correct and useful.
-- **`review`** — genuinely borderline: current doc status is unclear, or you cannot judge without
-  knowing whether the described issue was resolved. Use sparingly — not as a dodge for uncertainty.
+  Being covered in current docs is **not** a reason to archive either.
+
+- **`review`** — genuinely borderline: you cannot tell from the post body whether the described
+  issue was resolved, or whether the approach is still valid. Use sparingly — not as a dodge
+  for uncertainty.
 
 Actively look for cases where you **disagree with the star score** — those are the point of this
 pass:
@@ -209,21 +217,26 @@ Emit one object per post. Do not skip any post.
 
 ## Verdict criteria
 
-**archive** — stale/obsolete: superseded by current docs, about deprecated products
-  (AppMon, Ruxit, dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic,
-  DaemonSet-based OA install), a one-off unresolved question with no lasting value,
-  or a basic FAQ now fully answered in documentation.
-  Strong archive signals: no resolution posted, version-specific errors for EOL versions
-  (OCP 3.x, DT 1.x–1.70, K8s < 1.18), demo tool issues (easyTravel), PCF/CF context.
+**archive** — content is stale or incorrect: about deprecated products (AppMon, Ruxit,
+  dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based OA
+  install), version-specific errors for EOL versions (OCP 3.x, DT 1.x–1.70, K8s < 1.18),
+  a one-off unresolved question with no lasting value, or demo tool issues (easyTravel).
+  Strong archive signals: no resolution posted, question trivially answered by any current
+  search, PCF/CF context.
 
-**keep** — still useful despite age: workable solution or how-to, pattern not fully covered
-  in current docs, community-endorsed (kudos ≥ 1), actively discussed (replies ≥ 5),
-  or a recurring operational challenge (certs, network isolation, service mesh,
-  non-privileged containers, multi-cluster scale, Go monitoring limitations, Istio coexistence).
-  Age alone is NOT a reason to archive if the content remains correct.
+  **Doc/blog overlap is NOT an archive signal.** Archive only when the content itself is
+  obsolete or incorrect — not because docs or a blog post also covers the topic. Having the
+  same knowledge in community + docs + blog is healthy; different users prefer different sources.
 
-**review** — genuinely borderline: current doc status is unclear, or you cannot judge
-  without knowing the resolution. Use sparingly — not as a default for uncertainty.
+**keep** — still useful despite age: workable solution or how-to, recurring operational
+  challenge (certs, network isolation, service mesh, non-privileged containers, multi-cluster
+  scale, Go monitoring limitations, Istio coexistence), community-endorsed (kudos ≥ 1), or
+  actively discussed (replies ≥ 5). Age alone is NOT a reason to archive if the content remains
+  correct. Being covered in current docs is NOT a reason to archive either.
+
+**review** — genuinely borderline: you cannot tell from the post body whether the described
+  issue was resolved, or whether the approach is still valid. Use sparingly — not as a default
+  for uncertainty.
 
 Look for disagreements with the rule-based star score — those are the point of this pass.
 A 5★ post that is actually a still-valid solution → keep.
@@ -234,17 +247,18 @@ A 1★–2★ post about truly deprecated tech → archive.
 ARCHIVE (confidence 0.88):
   Subject: "Deploying OneAgent on IBM Kubernetes IKS v1.10/1.11"
   Verdict: archive — IKS v1.10/1.11 are years past K8s EOL; install method and errors are
-  entirely obsolete.
+  entirely obsolete. The obsolescence is in the content, not just that docs cover it.
 
 KEEP (confidence 0.85):
   Subject: "Configuring trusted root certificates on ActiveGate for K8s cluster SSL"
   Verdict: keep — shows a concrete PKIX failure and keytool steps for private-CA K8s clusters.
-  Certificate trust for K8s monitoring is a recurring enterprise pain point.
+  Certificate trust for K8s monitoring is a recurring enterprise pain point, valuable even if
+  docs cover the general topic.
 
 REVIEW (confidence 0.55):
   Subject: "Official DT recommendations for deploying via Flux or ArgoCD"
-  Verdict: review — DT may have published GitOps guidance since this was asked; unclear without
-  checking current docs.
+  Verdict: review — the post body is a question with no accepted answer; unclear whether the
+  described deployment pattern is still valid or has been superseded by a different approach.
 ```
 
 ---
