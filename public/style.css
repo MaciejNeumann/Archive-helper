@@ -381,7 +381,26 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
   margin: 4px 0 8px;
 }
 .export-dialog .export-scope label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.export-dialog .export-count { font-weight: 600; }
+.export-count { font-size: 13px; font-weight: 600; margin: 4px 0 0; }
+.export-count.muted { font-weight: normal; }
+.export-batch-hint {
+  font-size: 12px;
+  color: #7a5800;
+  background: #fff8e6;
+  border: 1px solid #f0d580;
+  border-radius: 6px;
+  padding: 7px 10px;
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
+.llm-coverage {
+  font-size: 12.5px;
+  color: var(--dt-ink-soft);
+  margin: 2px 0 0;
+}
+.llm-coverage strong { color: var(--dt-ink); }
+.llm-coverage-disagree { color: #b32035; font-weight: 600; }
 
 .overlap-sources { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 1px; }
 .source-chip {

@@ -70,6 +70,7 @@
       <div>
         <h2 id="resultsTitle">Results</h2>
         <p class="muted" id="resultsSummary"></p>
+        <p class="llm-coverage" id="llmCoverage" hidden></p>
       </div>
       <div class="results-actions">
         <input id="searchBox" class="search" type="search" placeholder="Filter by subject, author, keyword…" />
@@ -79,6 +80,14 @@
           <option value="4">4★ and up</option>
           <option value="3">3★ and up</option>
           <option value="2">2★ and up</option>
+        </select>
+        <select id="llmFilter" class="select">
+          <option value="">All LLM verdicts</option>
+          <option value="archive">LLM: Archive</option>
+          <option value="keep">LLM: Keep</option>
+          <option value="review">LLM: Review</option>
+          <option value="disagree">LLM disagrees</option>
+          <option value="none">No LLM verdict</option>
         </select>
         <button id="exportBtn" class="ghost-btn" title="Export results as CSV + JSON for LLM analysis">Export</button>
         <button id="importLlmBtn" class="ghost-btn" title="Import an LLM review file to overlay verdicts">Import LLM review</button>
@@ -116,7 +125,8 @@
     <label><input type="radio" name="exportScope" value="view" /> <span>Current filtered view</span></label>
     <label><input type="radio" name="exportScope" value="unchecked" /> <span>Only unchecked posts</span></label>
   </fieldset>
-  <p class="muted export-count" id="exportCount"></p>
+  <p class="export-count" id="exportCount"></p>
+  <p class="export-batch-hint" id="exportBatchHint" hidden></p>
   <div class="sessions-dialog-actions">
     <button type="button" id="exportConfirmBtn" class="primary-btn">Download CSV + JSON</button>
     <form method="dialog"><button class="ghost-btn">Cancel</button></form>

@@ -3,7 +3,7 @@ const state = {
   sessionId: null,
   posts: [],
   sort: { key: 'stars', dir: 'desc' },
-  filter: { text: '', minStars: 0 },
+  filter: { text: '', minStars: 0, llmVerdict: '' },
   analyzing: false,
 };
 
@@ -224,14 +224,41 @@ const loadResults = async (sessionId) => {
   $('#resultsSection').hidden = false;
   $('#newCsvBtn').hidden = false;
   $('#resultsTitle').textContent = `Results · ${data.sourceFile || ''}`;
+  renderLlmCoverage(data.posts);
   renderResults();
 };
 
+const renderLlmCoverage = (posts) => {
+  const analyzed = (posts || []).filter((p) => p.analyzed);
+  const withVerdict = analyzed.filter((p) => p.llmVerdict);
+  const el = $('#llmCoverage');
+  if (withVerdict.length === 0) {
+    el.hidden = true;
+    return;
+  }
+  const pct = Math.round((withVerdict.length / analyzed.length) * 100);
+  const disagreements = withVerdict.filter(llmDisagreesWithStars).length;
+  const counts = withVerdict.reduce((a, p) => { a[p.llmVerdict] = (a[p.llmVerdict] || 0) + 1; return a; }, {});
+  const parts = ['archive', 'keep', 'review'].filter((v) => counts[v]).map((v) => `${counts[v]} ${v}`);
+  el.innerHTML = `LLM review: <strong>${withVerdict.length} / ${analyzed.length} posts</strong> (${pct}%) — ${parts.join(' · ')}${disagreements ? ` · <span class="llm-coverage-disagree">${disagreements} disagree with ★ score</span>` : ''}`;
+  el.hidden = false;
+};
+
+const llmDisagreesWithStars = (p) => {
+  if (!p.llmVerdict) return false;
+  if (p.llmVerdict === 'keep' && p.stars >= 4) return true;
+  if (p.llmVerdict === 'archive' && p.stars <= 2) return true;
+  return false;
+};
+
 const filteredSortedPosts = () => {
-  const { text, minStars } = state.filter;
+  const { text, minStars, llmVerdict } = state.filter;
   const needle = text.trim().toLowerCase();
   let rows = state.posts.filter((p) => p.analyzed);
   if (minStars > 0) rows = rows.filter((p) => p.stars >= minStars);
+  if (llmVerdict === 'none') rows = rows.filter((p) => !p.llmVerdict);
+  else if (llmVerdict === 'disagree') rows = rows.filter(llmDisagreesWithStars);
+  else if (llmVerdict) rows = rows.filter((p) => p.llmVerdict === llmVerdict);
   if (needle) {
     rows = rows.filter((p) => {
       const blob = `${p.subject} ${p.author} ${(p.keywords || []).join(' ')}`.toLowerCase();
@@ -445,6 +472,10 @@ const handleStarFilter = () => {
   state.filter.minStars = parseInt($('#starFilter').value, 10) || 0;
   renderResults();
 };
+const handleLlmFilter = () => {
+  state.filter.llmVerdict = $('#llmFilter').value;
+  renderResults();
+};
 
 // ------------------------- Export / Import -------------------------
 const EXPORT_COLUMNS = [
@@ -543,9 +574,23 @@ const exportBaseName = (scope) => {
 const selectedExportScope = () =>
   ($('input[name="exportScope"]:checked') || {}).value || 'all';
 
+const BATCH_SIZE = 30;
+const BATCH_THRESHOLD = 40;
+
 const updateExportCount = () => {
   const n = gatherExportPosts(selectedExportScope()).length;
-  $('#exportCount').textContent = `${n} post${n === 1 ? '' : 's'} will be exported.`;
+  const countEl = $('#exportCount');
+  const hintEl = $('#exportBatchHint');
+  countEl.textContent = `${n} post${n === 1 ? '' : 's'} will be exported.`;
+  countEl.className = 'export-count' + (n === 0 ? ' muted' : '');
+  if (n > BATCH_THRESHOLD) {
+    const batches = Math.ceil(n / BATCH_SIZE);
+    const mins = batches <= 10 ? '5–15' : batches <= 25 ? '15–40' : '40–90';
+    hintEl.textContent = `The analyze-post-context skill will process this in ~${batches} batches of ${BATCH_SIZE} posts (est. ${mins} min). Consider filtering to "Unchecked only" to reduce scope.`;
+    hintEl.hidden = false;
+  } else {
+    hintEl.hidden = true;
+  }
 };
 
 const openExportDialog = () => {
@@ -683,6 +728,7 @@ const init = () => {
   $('#resultsTbody').addEventListener('change', handleCheckboxToggle);
   $('#searchBox').addEventListener('input', handleSearch);
   $('#starFilter').addEventListener('change', handleStarFilter);
+  $('#llmFilter').addEventListener('change', handleLlmFilter);
   $('#newCsvBtn').addEventListener('click', handleNewCsv);
   $('#loadSessionBtn').addEventListener('click', openSessionsDialog);
   $('#sessionsList').addEventListener('click', handleSessionsClick);
