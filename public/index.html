@@ -71,6 +71,10 @@
         <h2 id="resultsTitle">Results</h2>
         <p class="muted" id="resultsSummary"></p>
         <p class="llm-coverage" id="llmCoverage" hidden></p>
+        <div class="mode-toggle" id="modeToggle" aria-label="Table view mode">
+          <button class="mode-btn" data-mode="review">Review</button>
+          <button class="mode-btn" data-mode="full">Full</button>
+        </div>
       </div>
       <div class="results-actions">
         <input id="searchBox" class="search" type="search" placeholder="Filter by subject, author, keyword…" />
@@ -101,14 +105,14 @@
           <tr>
             <th class="col-checked">✓</th>
             <th class="col-stars sortable" data-sort="stars">Score</th>
+            <th class="col-llm sortable" data-sort="llmVerdict" title="LLM review verdict, imported from the analyze-post-context skill">LLM review</th>
             <th class="col-subject sortable" data-sort="subject">Post</th>
-            <th class="col-author sortable" data-sort="author">Author</th>
-            <th class="col-date sortable" data-sort="postedAt">Posted</th>
-            <th class="col-num sortable" data-sort="replies">Replies</th>
-            <th class="col-num sortable" data-sort="kudos">Kudos</th>
             <th class="col-overlap sortable" data-sort="docOverlapMatched" title="Number of post keywords found in docs.dynatrace.com or the Dynatrace Blog (ascending: Missing first, then thinnest matches)">Docs &amp; Blog overlap</th>
             <th class="col-why">Why this score</th>
-            <th class="col-llm sortable" data-sort="llmVerdict" title="LLM review verdict, imported from the analyze-post-context skill">LLM review</th>
+            <th class="col-author col-meta sortable" data-sort="author">Author</th>
+            <th class="col-date col-meta sortable" data-sort="postedAt">Posted</th>
+            <th class="col-num col-meta sortable" data-sort="replies">Replies</th>
+            <th class="col-num col-meta sortable" data-sort="kudos">Kudos</th>
           </tr>
         </thead>
         <tbody id="resultsTbody"></tbody>

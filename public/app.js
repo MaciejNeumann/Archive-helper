@@ -5,6 +5,7 @@ const state = {
   sort: { key: 'stars', dir: 'desc' },
   filter: { text: '', minStars: 0, llmVerdict: '' },
   analyzing: false,
+  tableMode: localStorage.getItem('dt-table-mode') || 'review',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -246,7 +247,8 @@ const renderLlmCoverage = (posts) => {
 
 const llmDisagreesWithStars = (p) => {
   if (!p.llmVerdict) return false;
-  if (p.llmVerdict === 'keep' && p.stars >= 4) return true;
+  // 3★+ posts are archive candidates; LLM saying "keep" is a real disagreement worth surfacing
+  if (p.llmVerdict === 'keep' && p.stars >= 3) return true;
   if (p.llmVerdict === 'archive' && p.stars <= 2) return true;
   return false;
 };
@@ -351,15 +353,23 @@ const renderLlmCell = (post) => {
   if (!post.llmVerdict) return '<span class="muted">—</span>';
   const verdict = post.llmVerdict;
   const label = LLM_VERDICT_LABEL[verdict] || verdict;
-  const conf = typeof post.llmConfidence === 'number'
-    ? `<span class="llm-conf">${Math.round(post.llmConfidence * 100)}%</span>`
+  const disagrees = llmDisagreesWithStars(post);
+  const disagreeBadge = disagrees
+    ? `<span class="llm-disagree-badge" title="LLM verdict disagrees with rule-based star score">⚡</span>`
     : '';
+  const pct = typeof post.llmConfidence === 'number' ? Math.round(post.llmConfidence * 100) : null;
+  const confBar = pct !== null ? `
+    <div class="llm-conf-row">
+      <div class="llm-conf-bar"><span class="llm-conf-fill llm-${verdict}" style="width:${pct}%"></span></div>
+      <span class="llm-conf">${pct}%</span>
+    </div>` : '';
   const summary = post.llmSummary
     ? `<div class="llm-summary" title="${escapeHtml(post.llmReasoning || '')}">${escapeHtml(shorten(post.llmSummary, 160))}</div>`
     : '';
   return `
     <div class="llm-cell">
-      <span class="llm-tag llm-${verdict}">${label}</span>${conf}
+      <div class="llm-tag-row"><span class="llm-tag llm-${verdict}">${label}</span>${disagreeBadge}</div>
+      ${confBar}
       ${summary}
     </div>
   `;
@@ -378,6 +388,7 @@ const renderResults = () => {
     const tr = document.createElement('tr');
     if (post.checked) tr.classList.add('checked');
     tr.dataset.idx = post.index;
+    if (post.llmVerdict) tr.dataset.llmVerdict = post.llmVerdict;
 
     const reasons = (post.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('');
     const kwScores = post.keywordScores || {};
@@ -392,12 +403,13 @@ const renderResults = () => {
       <td class="col-checked">
         <input type="checkbox" class="checked-box" ${post.checked ? 'checked' : ''} data-idx="${post.index}" />
       </td>
-      <td class="col-stars">
+      <td class="col-stars" data-stars="${post.stars || 1}">
         <div class="score-cell">
           ${renderStars(post.stars || 1)}
           <span class="raw">raw score ${post.rawScore ?? 0}</span>
         </div>
       </td>
+      <td class="col-llm">${renderLlmCell(post)}</td>
       <td class="col-subject">
         <a class="post-link" href="${escapeHtml(post.url)}" target="_blank" rel="noopener">
           ${escapeHtml(post.subject || '(no subject)')}
@@ -405,15 +417,14 @@ const renderResults = () => {
         <div class="post-snippet">${escapeHtml(shorten(post.body, 160))}</div>
         ${keywords ? `<div class="post-keywords">${keywords}</div>` : ''}
       </td>
-      <td class="col-author">${escapeHtml(post.author || '—')}</td>
-      <td class="col-date">${formatDate(post.postedAt)}</td>
-      <td class="col-num">${renderNumCell(post.replies)}</td>
-      <td class="col-num">${renderNumCell(post.kudos)}</td>
       <td class="col-overlap">${renderOverlapCell(post)}</td>
       <td class="col-why">
         ${reasons ? `<ul class="why-list">${reasons}</ul>` : '<span class="muted">No archive signals.</span>'}
       </td>
-      <td class="col-llm">${renderLlmCell(post)}</td>
+      <td class="col-author col-meta">${escapeHtml(post.author || '—')}</td>
+      <td class="col-date col-meta">${formatDate(post.postedAt)}</td>
+      <td class="col-num col-meta">${renderNumCell(post.replies)}</td>
+      <td class="col-num col-meta">${renderNumCell(post.kudos)}</td>
     `;
     frag.appendChild(tr);
   }
@@ -462,6 +473,28 @@ const handleCheckboxToggle = async (e) => {
   } catch (err) {
     showToast(err.message, true);
   }
+};
+
+const resetFilters = () => {
+  state.filter = { text: '', minStars: 0, llmVerdict: '' };
+  $('#searchBox').value = '';
+  $('#starFilter').value = '0';
+  $('#llmFilter').value = '';
+};
+
+const applyTableMode = () => {
+  const table = $('#resultsTable');
+  const isReview = state.tableMode === 'review';
+  table.classList.toggle('review-mode', isReview);
+  $$('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === state.tableMode));
+  localStorage.setItem('dt-table-mode', state.tableMode);
+};
+
+const handleModeToggle = (e) => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn || btn.dataset.mode === state.tableMode) return;
+  state.tableMode = btn.dataset.mode;
+  applyTableMode();
 };
 
 const handleSearch = () => {
@@ -543,6 +576,11 @@ const buildJson = (posts, scope) => JSON.stringify({
     docLatestMatchAt: p.docLatestMatchAt || null,
     docLatestMatchSource: p.docLatestMatchSource || null,
     checked: !!p.checked,
+    llmVerdict: p.llmVerdict || null,
+    llmConfidence: p.llmConfidence ?? null,
+    llmSummary: p.llmSummary || null,
+    llmReasoning: p.llmReasoning || null,
+    llmAnalyzedAt: p.llmAnalyzedAt || null,
   })),
 }, null, 2);
 
@@ -574,14 +612,22 @@ const exportBaseName = (scope) => {
 const selectedExportScope = () =>
   ($('input[name="exportScope"]:checked') || {}).value || 'all';
 
+// BATCH_SIZE must stay in sync with the batch-mode step 1 constant in SKILL.md
 const BATCH_SIZE = 30;
 const BATCH_THRESHOLD = 40;
 
+const LLM_FILTER_LABELS = { archive: 'LLM: Archive', keep: 'LLM: Keep', review: 'LLM: Review', disagree: 'LLM disagrees', none: 'No LLM verdict' };
+
 const updateExportCount = () => {
-  const n = gatherExportPosts(selectedExportScope()).length;
+  const scope = selectedExportScope();
+  const n = gatherExportPosts(scope).length;
   const countEl = $('#exportCount');
   const hintEl = $('#exportBatchHint');
-  countEl.textContent = `${n} post${n === 1 ? '' : 's'} will be exported.`;
+  let countText = `${n} post${n === 1 ? '' : 's'} will be exported.`;
+  if (scope === 'view' && state.filter.llmVerdict) {
+    countText += ` (LLM filter active: ${LLM_FILTER_LABELS[state.filter.llmVerdict] || state.filter.llmVerdict})`;
+  }
+  countEl.textContent = countText;
   countEl.className = 'export-count' + (n === 0 ? ' muted' : '');
   if (n > BATCH_THRESHOLD) {
     const batches = Math.ceil(n / BATCH_SIZE);
@@ -630,7 +676,7 @@ const handleLlmFileChosen = async (e) => {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Import failed');
-    showToast(`Imported ${data.matched} LLM verdict${data.matched === 1 ? '' : 's'}${data.skipped ? ` · ${data.skipped} skipped` : ''}`);
+    showToast(`Imported ${data.matched} LLM verdict${data.matched === 1 ? '' : 's'}${data.skipped ? ` · ${data.skipped} skipped` : ''}${data.coerced ? ` · ${data.coerced} invalid verdict${data.coerced === 1 ? '' : 's'} coerced to "review"` : ''}`);
     await loadResults(state.sessionId);
   } catch (err) {
     showToast(`Import failed: ${err.message}`, true);
@@ -684,6 +730,7 @@ const handleSessionsClick = async (e) => {
   const { action, id } = btn.dataset;
   if (action === 'load') {
     $('#sessionsDialog').close();
+    resetFilters();
     await loadResults(id);
     $('#uploadSection').hidden = true;
     $('#progressSection').hidden = true;
@@ -704,6 +751,7 @@ const handleSaveSession = async () => {
 };
 
 const handleNewCsv = () => {
+  resetFilters();
   handleFileCleared();
   $('#resultsSection').hidden = true;
   $('#progressSection').hidden = true;
@@ -740,6 +788,8 @@ const init = () => {
   $('#exportDialog').addEventListener('change', updateExportCount);
   $('#importLlmBtn').addEventListener('click', handleImportLlm);
   $('#llmImportFile').addEventListener('change', handleLlmFileChosen);
+  $('#modeToggle').addEventListener('click', handleModeToggle);
+  applyTableMode();
 };
 
 init();

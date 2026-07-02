@@ -50,9 +50,16 @@ router.post('/:id/llm-import', requireValidId, async (req, res) => {
   if (!Array.isArray(results)) {
     return res.status(400).json({ error: 'Expected a JSON array of results or { results: [...] }' });
   }
-  const valid = results.filter((r) => r && Number.isInteger(r.index));
+  // Also accept numeric strings (e.g. "42") from hand-edited JSON — coerce them to integers
+  const valid = results.filter((r) => {
+    if (!r) return false;
+    if (Number.isInteger(r.index)) return true;
+    const n = Number(r.index);
+    if (Number.isInteger(n)) { r.index = n; return true; }
+    return false;
+  });
   if (valid.length === 0) {
-    return res.status(400).json({ error: 'No results with a valid integer "index" field' });
+    return res.status(400).json({ error: 'No results with a valid "index" field (must be an integer or numeric string)' });
   }
   try {
     const outcome = await mergeLlmResults(req.params.id, valid);
