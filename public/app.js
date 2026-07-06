@@ -1,6 +1,7 @@
 // ------------------------- State -------------------------
 const state = {
   sessionId: null,
+  sessionName: '',
   posts: [],
   sort: { key: 'stars', dir: 'desc' },
   filter: { text: '', minStars: 0, llmVerdict: '' },
@@ -219,12 +220,14 @@ const loadResults = async (sessionId) => {
   }
   const data = await r.json();
   state.sessionId = data.id;
+  state.sessionName = data.name || '';
   state.posts = data.posts;
   state.sourceFile = data.sourceFile || '';
   $('#progressSection').hidden = true;
   $('#resultsSection').hidden = false;
   $('#newCsvBtn').hidden = false;
   $('#resultsTitle').textContent = `Results · ${data.sourceFile || ''}`;
+  $('#sessionNameInput').value = state.sessionName;
   renderLlmCoverage(data.posts);
   renderResults();
 };
@@ -378,8 +381,10 @@ const renderLlmCell = (post) => {
 const renderResults = () => {
   const rows = filteredSortedPosts();
   const totalChecked = state.posts.filter((p) => p.checked).length;
+  const totalArchived = state.posts.filter((p) => p.archived).length;
+  const archivedPart = totalArchived > 0 ? ` · ${totalArchived} archived` : '';
   $('#resultsSummary').textContent =
-    `${rows.length} shown · ${state.posts.length} total · ${totalChecked} checked`;
+    `${rows.length} shown · ${state.posts.length} total · ${totalChecked} checked${archivedPart}`;
 
   const tbody = $('#resultsTbody');
   tbody.innerHTML = '';
@@ -387,6 +392,7 @@ const renderResults = () => {
   for (const post of rows) {
     const tr = document.createElement('tr');
     if (post.checked) tr.classList.add('checked');
+    if (post.archived) tr.classList.add('archived');
     tr.dataset.idx = post.index;
     if (post.llmVerdict) tr.dataset.llmVerdict = post.llmVerdict;
 
@@ -402,6 +408,9 @@ const renderResults = () => {
     tr.innerHTML = `
       <td class="col-checked">
         <input type="checkbox" class="checked-box" ${post.checked ? 'checked' : ''} data-idx="${post.index}" />
+      </td>
+      <td class="col-archived">
+        <input type="checkbox" class="archived-box" ${post.archived ? 'checked' : ''} data-idx="${post.index}" />
       </td>
       <td class="col-stars" data-stars="${post.stars || 1}">
         <div class="score-cell">
@@ -470,6 +479,48 @@ const handleCheckboxToggle = async (e) => {
       body: JSON.stringify({ postIndex: idx, checked }),
     });
     if (!r.ok) throw new Error((await r.json()).error || 'Save failed');
+  } catch (err) {
+    showToast(err.message, true);
+  }
+};
+
+const handleArchivedToggle = async (e) => {
+  const cb = e.target;
+  if (!cb.classList.contains('archived-box')) return;
+  const idx = parseInt(cb.dataset.idx, 10);
+  const archived = cb.checked;
+  const post = state.posts.find((p) => p.index === idx);
+  if (post) post.archived = archived;
+  cb.closest('tr').classList.toggle('archived', archived);
+  try {
+    const r = await fetch(`/api/sessions/${state.sessionId}/archived`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postIndex: idx, archived }),
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      let msg = 'Save failed';
+      try { msg = JSON.parse(body).error || msg; } catch {}
+      throw new Error(msg);
+    }
+  } catch (err) {
+    showToast(err.message, true);
+  }
+};
+
+const handleSessionNameSave = async () => {
+  if (!state.sessionId) return;
+  const name = $('#sessionNameInput').value.trim();
+  if (name === state.sessionName) return;
+  try {
+    const r = await fetch(`/api/sessions/${state.sessionId}/name`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) throw new Error((await r.json()).error || 'Save failed');
+    state.sessionName = name;
   } catch (err) {
     showToast(err.message, true);
   }
@@ -697,10 +748,12 @@ const openSessionsDialog = async () => {
   }
   for (const s of sessions) {
     const li = document.createElement('li');
+    const displayName = escapeHtml(s.name || s.sourceFile || s.id);
+    const subParts = [s.name ? escapeHtml(s.sourceFile || '') : null, `${s.postCount} posts`, `saved ${new Date(s.updatedAt).toLocaleString()}`].filter(Boolean);
     li.innerHTML = `
       <div class="session-meta">
-        <span class="name">${escapeHtml(s.sourceFile || s.id)}</span>
-        <span class="sub">${s.postCount} posts · saved ${new Date(s.updatedAt).toLocaleString()}</span>
+        <span class="name">${displayName}</span>
+        <span class="sub">${subParts.join(' · ')}</span>
       </div>
       <div class="session-actions">
         <button class="ghost-btn" data-action="load" data-id="${s.id}">Load</button>
@@ -775,6 +828,9 @@ const init = () => {
   $('#uploadForm').addEventListener('submit', handleUploadSubmit);
   $('#resultsTable thead').addEventListener('click', handleSortClick);
   $('#resultsTbody').addEventListener('change', handleCheckboxToggle);
+  $('#resultsTbody').addEventListener('change', handleArchivedToggle);
+  $('#sessionNameInput').addEventListener('blur', handleSessionNameSave);
+  $('#sessionNameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
   $('#searchBox').addEventListener('input', handleSearch);
   $('#starFilter').addEventListener('change', handleStarFilter);
   $('#llmFilter').addEventListener('change', handleLlmFilter);

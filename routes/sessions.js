@@ -6,6 +6,7 @@ const {
   deleteSession,
   deleteAllSessions,
   mergeLlmResults,
+  updateSessionName,
   isValidSessionId,
 } = require('../lib/session-store');
 
@@ -65,6 +66,20 @@ router.post('/:id/llm-import', requireValidId, async (req, res) => {
     const outcome = await mergeLlmResults(req.params.id, valid);
     if (!outcome) return res.status(404).json({ error: 'Session not found' });
     res.json(outcome);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/:id/name', requireValidId, async (req, res) => {
+  const { name } = req.body || {};
+  if (typeof name !== 'string') {
+    return res.status(400).json({ error: 'name (string) required' });
+  }
+  try {
+    const result = await updateSessionName(req.params.id, name);
+    if (!result) return res.status(404).json({ error: 'Session not found' });
+    res.json({ ok: true, name: result.name || '' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

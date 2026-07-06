@@ -68,6 +68,7 @@ const handleUpload = (req, res) => {
         docMatchedBlogPages: 0,
         docOverlapVerdict: null,
         checked: false,
+        archived: false,
         analyzed: false,
       };
     });

@@ -69,6 +69,7 @@
     <header class="results-header">
       <div>
         <h2 id="resultsTitle">Results</h2>
+        <input id="sessionNameInput" class="session-name-input" type="text" placeholder="Add a session name…" maxlength="100" autocomplete="off" />
         <p class="muted" id="resultsSummary"></p>
         <p class="llm-coverage" id="llmCoverage" hidden></p>
         <div class="mode-toggle" id="modeToggle" aria-label="Table view mode">
@@ -103,7 +104,10 @@
       <table id="resultsTable" class="results-table">
         <thead>
           <tr>
-            <th class="col-checked">✓</th>
+            <th class="col-checked" title="Reviewed">✓</th>
+            <th class="col-archived" title="Archived in community">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px"><rect x="1.5" y="5" width="13" height="9" rx="1.5"/><path d="M1.5 5h13" stroke-width="1.2"/><path d="M1 3h14" stroke-linecap="round"/><path d="M6 8.5h4" stroke-linecap="round"/></svg>
+            </th>
             <th class="col-stars sortable" data-sort="stars">Score</th>
             <th class="col-llm sortable" data-sort="llmVerdict" title="LLM review verdict, imported from the analyze-post-context skill">LLM review</th>
             <th class="col-subject sortable" data-sort="subject">Post</th>
