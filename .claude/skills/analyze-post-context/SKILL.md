@@ -44,17 +44,33 @@ match verdicts back to the right post.
 `replyPosts` contains the actual bodies of all replies to the thread. It may be an empty array
 for posts that received no replies, or for exports made before this feature was added.
 
+## Default posture
+
+**When in doubt, keep or review — never archive on uncertainty alone.**
+
+Archive requires **positive evidence** that the content is obsolete or wrong. The absence of a
+reply, the absence of a resolution, or the presence of a version number are not enough on their
+own. The cost of a false archive (removing content that would have helped someone) is higher than
+the cost of a false keep (retaining slightly stale content). If you can't clearly see that the
+content has no value for anyone anymore, it should stay.
+
 ## How to judge each post
 
 Read `subject` + `body` first, then read `replyPosts` (all replies in the thread), then weigh
 the metadata. Decide one of:
 
-- **`archive`** — content is stale or incorrect: about a deprecated product (AppMon, Ruxit,
-  dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based OA
-  install), version-specific errors for EOL versions (OCP 3.x, DT 1.x–1.70, K8s < 1.18),
-  a one-off question long since resolved with no lasting value, or demo-tool issues (easyTravel).
-  Strong archive signals: no resolution posted, question is trivially answered by any current
-  search, PCF/CF context.
+- **`archive`** — the content has **clearly** lost all value: about a deprecated product (AppMon,
+  Ruxit, dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based
+  OA install), version-specific errors for EOL platforms (OCP 3.x, K8s < 1.18), or demo-tool
+  issues (easyTravel). Also archive a post that is a single trivial sentence with no replies and
+  no content that couldn't be found in 10 seconds via docs search.
+  Strong archive signals: **the product/platform itself is EOL or deprecated**, AND the post
+  adds nothing (no troubleshooting steps, no config detail, no real-world context) beyond what
+  a docs search returns. PCF/CF context is a reliable archive signal.
+
+  **Mentioning a version number does NOT make a post obsolete.** Archive only when the
+  product/platform is EOL — not because a version number appears incidentally in a post about a
+  concept that still applies.
 
   **Doc/blog overlap is NOT an archive signal.** A community post on the same topic as docs or
   a blog post is healthy — different users prefer different knowledge sources. Archive only when
@@ -76,16 +92,24 @@ the metadata. Decide one of:
   a reply redirecting to the correct alternative ("don't use X for this, use Y instead");
   a reply stating "fixed in version X" (tells users whether they need to upgrade).
 
-- **`review`** — genuinely borderline: you cannot tell from the post body or its replies whether
-  the described issue was resolved, or whether the approach is still valid. Use sparingly — not
-  as a dodge for uncertainty. If `replyPosts` is empty and the topic is inherently ambiguous,
-  `review` is appropriate; if replies are present and you can evaluate their quality, lean toward
-  a confident verdict instead.
+- **`review`** — use this as your **safe fallback** whenever you are genuinely uncertain. Archive
+  requires positive evidence of obsolescence; if that evidence is absent or ambiguous, choose
+  `review` over `archive`. Specific cases that should be `review` rather than `archive`:
+  — a detailed unanswered question (long body, error messages, logs, config snippets) with no
+    replies: it documents a real pain point even without an answer, route to human review;
+  — a thread where the technology is current but the resolution is unclear;
+  — any post less than 18 months old that is not about a clearly deprecated product.
+  Do not use `review` as a lazy default when the content is obviously obsolete — reserve it for
+  cases where a human's domain knowledge would genuinely change the verdict.
+
+**Recency protection:** posts less than 18 months old almost certainly describe current product
+behavior and active user pain points. Do not archive them unless the technology in the post is
+clearly deprecated (e.g. a post about AppMon published last year). Default to `keep` or `review`.
 
 Actively look for cases where you **disagree with the star score** — those are the point of this
 pass:
 - A 5★ (rule-says-archive) post that is actually a still-valid solution → `keep`.
-- A 1★–2★ post that is really a resolved trivial question about deprecated tech → `archive`.
+- A 1★–2★ post about a truly deprecated product with no useful content → `archive`.
 
 `llmConfidence` is 0.0–1.0: how sure you are of the verdict. High (>0.8) when the body makes it
 obvious; lower when you're inferring.
@@ -239,14 +263,29 @@ Return ONLY a raw JSON array (no markdown fences, no explanation):
 
 Emit one object per post. Do not skip any post.
 
+## Default posture
+
+**When in doubt, keep or review — never archive on uncertainty alone.**
+Archive requires positive evidence that the content is obsolete or wrong. Absence of a reply or
+a resolution is NOT enough on its own. If you can't clearly see that the content has no value
+for anyone anymore, choose `review`, not `archive`.
+
+**Recency protection:** posts less than 18 months old should not be archived unless the
+technology in the post is clearly deprecated (e.g. AppMon, PCF). Default to `keep` or `review`.
+
 ## Verdict criteria
 
-**archive** — content is stale or incorrect: about deprecated products (AppMon, Ruxit,
-  dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based OA
-  install), version-specific errors for EOL versions (OCP 3.x, DT 1.x–1.70, K8s < 1.18),
-  a one-off unresolved question with no lasting value, or demo tool issues (easyTravel).
-  Strong archive signals: no resolution posted AND no useful reply, question trivially answered
-  by any current search, PCF/CF context.
+**archive** — the content has clearly lost all value: about a deprecated product/platform
+  (AppMon, Ruxit, dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic,
+  DaemonSet-based OA install) OR an EOL platform version (OCP 3.x, K8s < 1.18) OR a demo tool
+  (easyTravel). Also archive a post that is a single trivial sentence with no replies, no
+  troubleshooting detail, and no real-world context beyond what a docs search returns.
+  Strong archive signal: the product/platform is EOL AND the post adds nothing original.
+  PCF/CF context is a reliable archive signal.
+
+  **Mentioning a version number does NOT make a post obsolete.** Only archive when the
+  product/platform itself is EOL — not because a version appears incidentally in a post about
+  a concept that still applies.
 
   **Doc/blog overlap is NOT an archive signal.** Archive only when the content itself is
   obsolete or incorrect — not because docs or a blog post also covers the topic. Having the
@@ -261,14 +300,18 @@ Emit one object per post. Do not skip any post.
   strong keep signal.** A thread where the original question looks stale but a reply says
   "this fixed it for me: …" or provides concrete steps still has lasting value.
 
-**review** — genuinely borderline: you cannot tell from the post and its replies whether the
-  described issue was resolved, or whether the approach is still valid. Use sparingly — not as
-  a default for uncertainty. If replies are present and you can evaluate their quality, lean
-  toward a confident verdict.
+**review** — your safe fallback whenever you are genuinely uncertain. Specific cases that
+  should be `review` rather than `archive`:
+  — detailed unanswered question (long body, error messages, logs, config snippets) with no
+    replies: it documents a real pain point even without an answer;
+  — technology is current but resolution is unclear;
+  — any post less than 18 months old that is not about a clearly deprecated product.
+  Do not use `review` when the content is obviously obsolete — reserve it for cases where a
+  human's domain knowledge would genuinely change the verdict.
 
 Look for disagreements with the rule-based star score — those are the point of this pass.
 A 5★ post that has a useful solution in the replies → keep.
-A 1★–2★ post about truly deprecated tech with no useful replies → archive.
+A 1★–2★ post about a truly deprecated product with no useful content → archive.
 
 ## How to evaluate replyPosts
 
