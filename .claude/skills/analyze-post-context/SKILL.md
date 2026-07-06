@@ -68,6 +68,13 @@ the metadata. Decide one of:
   **A reply that contains a working solution or confirms a resolution is a strong keep signal** —
   even if the original question looks unresolved, a reply saying "this fixed it: …" or providing
   concrete steps means the thread has lasting value. Read `replyPosts` carefully before deciding.
+  **The following reply types are also strong keep signals — even when no solution exists:**
+  a reply confirming "this is not possible / not supported" (saves others from dead-end investigation);
+  a reply correcting a misconception ("you're thinking about this wrong; the correct approach is…");
+  a reply confirming a known limitation with an RFE link (others can +1 instead of filing duplicates);
+  a Dynatrace employee confirming "by design" behavior (prevents unnecessary support tickets);
+  a reply redirecting to the correct alternative ("don't use X for this, use Y instead");
+  a reply stating "fixed in version X" (tells users whether they need to upgrade).
 
 - **`review`** — genuinely borderline: you cannot tell from the post body or its replies whether
   the described issue was resolved, or whether the approach is still valid. Use sparingly — not
@@ -267,13 +274,31 @@ A 1★–2★ post about truly deprecated tech with no useful replies → archiv
 
 Each entry in `replyPosts` has: `author`, `postedAt`, `subject`, `body`.
 
-- **Useful reply signals** (lean keep): concrete steps or commands that solve the issue;
-  a Dynatrace employee confirming official guidance; "this worked for me" + description of what;
-  a workaround for a known limitation; clarification that corrects a misconception.
-- **Non-useful reply signals** (don't prevent archive): "me too", "did you ever solve this?",
-  "+1", "I have the same issue", one-line acknowledgement with no solution, out-of-office
-  auto-replies, pure links without explanation.
-- **Mixed**: a reply that partially helps but references further follow-up — lean review.
+**Useful reply signals — lean keep (even without a working solution):**
+- Concrete steps or commands that solve the issue
+- "This worked for me" + description of what was done
+- A workaround for a known limitation
+- **"This is not possible / not supported"** — confirms a feature gap and saves others from
+  dead-end investigation. The absence of a solution is itself useful community knowledge.
+- **Misconception corrected** — a reply that says "you're thinking about this wrong; the
+  correct approach is…" has lasting value for anyone with the same misunderstanding.
+- **Known limitation + RFE filed** — a reply confirming this is a documented product gap
+  with a product idea link. Others can +1 the same request and avoid duplicate tickets.
+- **"By design" from a Dynatrace employee** — authoritative confirmation that the behavior
+  is intentional, not a bug. Saves others from filing support tickets or troubleshooting
+  expected behavior.
+- **"Use X instead of Y"** — the approach in the question is wrong or suboptimal and a reply
+  redirects to the correct alternative. Prevents others from going down the same dead-end path.
+- **"Fixed in version X"** — confirms a bug or gap was resolved in a specific release. Tells
+  users when they can stop applying a workaround or whether they need to upgrade.
+
+**Non-useful reply signals — do not prevent archive:**
+- "Me too", "did you ever solve this?", "+1", "I have the same issue"
+- One-line acknowledgement with no technical content
+- Out-of-office auto-replies
+- Bare links without any explanation of what they answer
+
+**Mixed:** a reply that partially helps but references further follow-up — lean review.
 
 ## Calibration examples (apply the same standard)
 
@@ -294,6 +319,46 @@ KEEP from reply (confidence 0.80):
   replyPosts: [{ body: "We fixed this by setting DT_LAMBDA_COLD_START_TIMEOUT=5000 in env vars." }]
   Verdict: keep — original body shows a hang after OTel init; reply provides the exact env var
   fix. The solution is actionable for anyone hitting the same Lambda cold-start issue.
+
+KEEP — not possible (confidence 0.82):
+  Subject: "Can I filter CloudWatch metrics by tag before they're ingested into Dynatrace?"
+  replyPosts: [{ body: "This is not currently supported. Tag filtering happens after ingestion." }]
+  Verdict: keep — the reply definitively answers that pre-ingestion filtering is not possible.
+  This saves others from investigating a non-existent feature and documents a known limitation.
+
+KEEP — misconception corrected (confidence 0.80):
+  Subject: "My service naming rules aren't splitting services into separate entities"
+  replyPosts: [{ body: "Naming rules change the display name but not the service identity.
+    You need process group detection rules to actually split services." }]
+  Verdict: keep — the reply corrects a common misunderstanding about naming vs. detection rules.
+  Anyone who hits the same wall will benefit from this clarification.
+
+KEEP — known limitation + RFE (confidence 0.78):
+  Subject: "Is there a way to see DDU consumption broken down per Azure subscription?"
+  replyPosts: [{ body: "Not possible today — per-subscription DDU breakdown isn't exposed.
+    I've raised a product idea here: [link]" }]
+  Verdict: keep — confirms an unresolved billing visibility gap and links the RFE. Useful for
+  others who want the same feature and should +1 the idea rather than file a duplicate.
+
+KEEP — by design (confidence 0.83):
+  Subject: "Why does Dynatrace show a separate DB instance for every pod using Cloud SQL proxy?"
+  replyPosts: [{ body: "This is expected behavior — DT identifies DB services by IP, and the
+    proxy assigns a unique IP per pod. It's by design, not a bug." }]
+  Verdict: keep — authoritative "by design" explanation prevents others from filing support
+  tickets for expected behavior in a common GKE/Cloud SQL topology.
+
+KEEP — redirect to correct approach (confidence 0.82):
+  Subject: "Using the v1 /entity/infrastructure/custom API to register permanent custom devices"
+  replyPosts: [{ body: "Don't use that endpoint — custom devices created via v1 expire after
+    72 hours. Use the Metric Ingestion API with dimensions instead." }]
+  Verdict: keep — the reply steers away from a broken approach and toward the correct one.
+  Saves anyone who finds this thread from going down the same dead-end path.
+
+KEEP — fixed in version (confidence 0.80):
+  Subject: "EC2 instance ID appearing as host.name in logs instead of hostname"
+  replyPosts: [{ body: "This was a bug fixed in OneAgent 1.299. Upgrade to resolve it." }]
+  Verdict: keep — version-pinned resolution tells users exactly when the fix shipped and
+  whether they need to upgrade. Still useful for anyone on an older agent version.
 
 REVIEW (confidence 0.55):
   Subject: "Official DT recommendations for deploying via Flux or ArgoCD"
