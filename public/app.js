@@ -565,6 +565,7 @@ const buildJson = (posts, scope) => JSON.stringify({
     postedAt: p.postedAt || null,
     replies: p.replies ?? 0,
     kudos: p.kudos ?? 0,
+    replyPosts: p.replyPosts || [],
     stars: p.stars ?? null,
     rawScore: p.rawScore ?? null,
     reasons: p.reasons || [],

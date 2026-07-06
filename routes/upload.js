@@ -22,6 +22,22 @@ const handleUpload = (req, res) => {
   const includeReplies = req.body && req.body.includeReplies === 'true';
   try {
     const { rows, errors } = parseCsv(req.file.path);
+
+    // Always capture reply content as context for LLM review, regardless of includeReplies flag.
+    // Maps parentUrl → array of {author, postedAt, subject, body} for each reply.
+    const replyMap = {};
+    rows.forEach((row) => {
+      if (isOriginalThread(row)) return;
+      const n = normalizeRow(row);
+      if (!replyMap[n.parentUrl]) replyMap[n.parentUrl] = [];
+      replyMap[n.parentUrl].push({
+        author: n.author,
+        postedAt: n.postedAt ? n.postedAt.toISOString() : null,
+        subject: n.subject,
+        body: n.body,
+      });
+    });
+
     const filtered = includeReplies ? rows : rows.filter(isOriginalThread);
     const posts = filtered.map((row, idx) => {
       const n = normalizeRow(row);
@@ -37,6 +53,8 @@ const handleUpload = (req, res) => {
         kudos: n.kudos,
         parentUrl: n.parentUrl,
         rootUrl: n.rootUrl,
+        // Reply bodies attached for LLM context; empty for reply rows themselves
+        replyPosts: isOriginalThread(row) ? (replyMap[n.url] || []) : [],
         stars: null,
         rawScore: null,
         reasons: [],

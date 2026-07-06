@@ -25,6 +25,9 @@ to parse); the `.csv` carries the same columns. The JSON shape is:
       "subject": "...", "body": "...full post text...",
       "url": "...", "author": "...", "postedAt": "2021-03-04T09:12:00.000Z",
       "replies": 0, "kudos": 0,
+      "replyPosts": [
+        { "author": "Jane Doe", "postedAt": "2021-03-05T10:00:00.000Z", "subject": "Re: ...", "body": "Here is how I solved it: ..." }
+      ],
       "stars": 5, "rawScore": 4, "reasons": ["Posted 4.1 years ago (>3y threshold)", "..."],
       "keywords": ["..."],
       "docOverlapVerdict": "stale", "docOverlapMatched": 2, "docOverlapMatchedTerms": ["..."],
@@ -38,9 +41,13 @@ to parse); the `.csv` carries the same columns. The JSON shape is:
 `index` is the stable key — it must survive unchanged into your output so the Archive Helper can
 match verdicts back to the right post.
 
+`replyPosts` contains the actual bodies of all replies to the thread. It may be an empty array
+for posts that received no replies, or for exports made before this feature was added.
+
 ## How to judge each post
 
-Read `subject` + `body` first, then weigh the metadata. Decide one of:
+Read `subject` + `body` first, then read `replyPosts` (all replies in the thread), then weigh
+the metadata. Decide one of:
 
 - **`archive`** — content is stale or incorrect: about a deprecated product (AppMon, Ruxit,
   dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based OA
@@ -58,10 +65,15 @@ Read `subject` + `body` first, then weigh the metadata. Decide one of:
   community-endorsed content (kudos ≥ 1), or an actively discussed thread (replies ≥ 5).
   Age alone is **not** a reason to archive if the content is still correct and useful.
   Being covered in current docs is **not** a reason to archive either.
+  **A reply that contains a working solution or confirms a resolution is a strong keep signal** —
+  even if the original question looks unresolved, a reply saying "this fixed it: …" or providing
+  concrete steps means the thread has lasting value. Read `replyPosts` carefully before deciding.
 
-- **`review`** — genuinely borderline: you cannot tell from the post body whether the described
-  issue was resolved, or whether the approach is still valid. Use sparingly — not as a dodge
-  for uncertainty.
+- **`review`** — genuinely borderline: you cannot tell from the post body or its replies whether
+  the described issue was resolved, or whether the approach is still valid. Use sparingly — not
+  as a dodge for uncertainty. If `replyPosts` is empty and the topic is inherently ambiguous,
+  `review` is appropriate; if replies are present and you can evaluate their quality, lean toward
+  a confident verdict instead.
 
 Actively look for cases where you **disagree with the star score** — those are the point of this
 pass:
@@ -131,7 +143,7 @@ console.log('Stars:', JSON.stringify(dist));
 | Post count | Mode |
 |---|---|
 | ≤ 40 posts | **Small** — read all bodies directly in one pass |
-| > 40 posts | **Batch** — spawn one sub-agent per batch of 30 posts (sequential) |
+| > 40 posts | **Batch (parallel)** — spawn up to 5 batch agents simultaneously, each covering 30 posts |
 
 ### Small mode (≤ 40 posts)
 
@@ -139,49 +151,53 @@ Read the input file directly. Analyze all post subjects and bodies. Produce the 
 
 ### Batch mode (> 40 posts)
 
-The context window cannot hold hundreds of post bodies. Process in batches of 30 using the Agent
-tool. Each batch agent gets a clean context window, reads its posts fully, returns verdicts. You
-collect and merge.
+Process in batches of 30 posts. Launch up to **5 batches in parallel** per round using the Agent
+tool — each agent gets a clean context window, reads its 30 posts fully, returns verdicts. You
+collect and merge after each round, then start the next.
 
-**For each batch (in sequence):**
-
-1. Extract the batch's posts from the input JSON using a Node.js script and write them to a temp
-   file next to the input (e.g. `<base>.batch-1-of-12.tmp.json`):
+**Step A — Pre-write ALL batch temp files at once** using a single Node.js script:
 
 ```js
 const fs = require('fs');
-const data = JSON.parse(fs.readFileSync('<INPUT_PATH>', 'utf8'));
 const BATCH_SIZE = 30;
-const start = (BATCH_N - 1) * BATCH_SIZE;
-const slice = data.posts.slice(start, start + BATCH_SIZE);
-fs.writeFileSync('<BATCH_TMP_PATH>', JSON.stringify(slice, null, 2));
-console.log('Written', slice.length, 'posts to batch file');
+const data = JSON.parse(fs.readFileSync('<INPUT_PATH>', 'utf8'));
+const totalBatches = Math.ceil(data.posts.length / BATCH_SIZE);
+for (let b = 1; b <= totalBatches; b++) {
+  const slice = data.posts.slice((b - 1) * BATCH_SIZE, b * BATCH_SIZE);
+  fs.writeFileSync(`<BASE>.batch-${b}-of-${totalBatches}.tmp.json`, JSON.stringify(slice, null, 2));
+}
+console.log('Written', totalBatches, 'batch files');
 ```
 
-2. **Spawn an Agent** using the Agent tool with the batch prompt below. The prompt tells the agent
-   to read the temp file, analyze every post, and return a raw JSON array.
+**Step B — Process in parallel rounds of 5:**
 
-3. **Parse the agent's return value** as JSON. If it wraps output in markdown fences, strip them.
-   Validate that it's an array with `index` fields.
+For each round (batches 1–5, then 6–10, then 11–15, …):
 
-4. Append the batch results to your `allResults` array.
+1. **Send one message with up to 5 Agent tool calls** — one per batch in the round. All 5 run
+   concurrently. Each agent reads its temp file, analyzes every post, and returns a raw JSON array.
 
-5. **Write a checkpoint file** immediately after each batch:
+2. **Wait for all agents in the round to finish**, then parse each result. Strip markdown fences
+   if present. Validate each is an array with `index` fields.
+
+3. Append all round results to your `allResults` array.
+
+4. **Write a checkpoint file** after each round:
 
 ```js
-fs.writeFileSync('<base>.checkpoint.json', JSON.stringify(allResults, null, 2));
+fs.writeFileSync('<BASE>.checkpoint.json', JSON.stringify(allResults, null, 2));
 ```
 
-6. **Delete the temp batch file** (it is now redundant).
-
-7. Print a progress line:
+5. Print a round progress line:
    ```
-   [Batch  3 / 12]  posts  61–90   →  21 archive · 7 keep · 2 review  ✓  (93 done, 267 remaining)
+   [Round 2 / 3]  batches 6–10  →  47 archive · 82 keep · 21 review  ✓  (150 done, 300 remaining)
    ```
 
-8. Proceed to the next batch.
+6. Proceed to the next round.
 
-After all batches complete, delete the checkpoint file and write the two final output files.
+After all rounds complete, delete the checkpoint file and write the two final output files.
+
+**Crash recovery:** if you need to resume after a failure, read the checkpoint to find how many
+results were already collected, skip those batches, and resume from the next unprocessed batch.
 
 ---
 
@@ -199,8 +215,9 @@ Batch {{BATCH_N}} of {{TOTAL_BATCHES}} — {{BATCH_START}}–{{BATCH_END}} of {{
 Read the batch file at this path:
   {{BATCH_FILE_PATH}}
 
-It is a JSON array of Dynatrace Community posts. For each post, read its subject and body,
-then produce a verdict. Return ONLY a raw JSON array (no markdown fences, no explanation):
+It is a JSON array of Dynatrace Community posts. For each post, read its `subject`, `body`,
+and `replyPosts` (all replies in the thread), then produce a verdict.
+Return ONLY a raw JSON array (no markdown fences, no explanation):
 
 [
   {
@@ -221,8 +238,8 @@ Emit one object per post. Do not skip any post.
   dynaTrace 6/7, classic UI, Cloud Foundry/PCF, MiniShift, RHEL Atomic, DaemonSet-based OA
   install), version-specific errors for EOL versions (OCP 3.x, DT 1.x–1.70, K8s < 1.18),
   a one-off unresolved question with no lasting value, or demo tool issues (easyTravel).
-  Strong archive signals: no resolution posted, question trivially answered by any current
-  search, PCF/CF context.
+  Strong archive signals: no resolution posted AND no useful reply, question trivially answered
+  by any current search, PCF/CF context.
 
   **Doc/blog overlap is NOT an archive signal.** Archive only when the content itself is
   obsolete or incorrect — not because docs or a blog post also covers the topic. Having the
@@ -233,32 +250,56 @@ Emit one object per post. Do not skip any post.
   scale, Go monitoring limitations, Istio coexistence), community-endorsed (kudos ≥ 1), or
   actively discussed (replies ≥ 5). Age alone is NOT a reason to archive if the content remains
   correct. Being covered in current docs is NOT a reason to archive either.
+  **Replies that contain working solutions, confirmed workarounds, or actionable steps are a
+  strong keep signal.** A thread where the original question looks stale but a reply says
+  "this fixed it for me: …" or provides concrete steps still has lasting value.
 
-**review** — genuinely borderline: you cannot tell from the post body whether the described
-  issue was resolved, or whether the approach is still valid. Use sparingly — not as a default
-  for uncertainty.
+**review** — genuinely borderline: you cannot tell from the post and its replies whether the
+  described issue was resolved, or whether the approach is still valid. Use sparingly — not as
+  a default for uncertainty. If replies are present and you can evaluate their quality, lean
+  toward a confident verdict.
 
 Look for disagreements with the rule-based star score — those are the point of this pass.
-A 5★ post that is actually a still-valid solution → keep.
-A 1★–2★ post about truly deprecated tech → archive.
+A 5★ post that has a useful solution in the replies → keep.
+A 1★–2★ post about truly deprecated tech with no useful replies → archive.
+
+## How to evaluate replyPosts
+
+Each entry in `replyPosts` has: `author`, `postedAt`, `subject`, `body`.
+
+- **Useful reply signals** (lean keep): concrete steps or commands that solve the issue;
+  a Dynatrace employee confirming official guidance; "this worked for me" + description of what;
+  a workaround for a known limitation; clarification that corrects a misconception.
+- **Non-useful reply signals** (don't prevent archive): "me too", "did you ever solve this?",
+  "+1", "I have the same issue", one-line acknowledgement with no solution, out-of-office
+  auto-replies, pure links without explanation.
+- **Mixed**: a reply that partially helps but references further follow-up — lean review.
 
 ## Calibration examples (apply the same standard)
 
 ARCHIVE (confidence 0.88):
   Subject: "Deploying OneAgent on IBM Kubernetes IKS v1.10/1.11"
+  replyPosts: [{ body: "Same issue here, waiting for a fix." }]
   Verdict: archive — IKS v1.10/1.11 are years past K8s EOL; install method and errors are
-  entirely obsolete. The obsolescence is in the content, not just that docs cover it.
+  entirely obsolete. The only reply is a "me too" with no solution.
 
 KEEP (confidence 0.85):
   Subject: "Configuring trusted root certificates on ActiveGate for K8s cluster SSL"
-  Verdict: keep — shows a concrete PKIX failure and keytool steps for private-CA K8s clusters.
-  Certificate trust for K8s monitoring is a recurring enterprise pain point, valuable even if
-  docs cover the general topic.
+  replyPosts: [{ body: "I resolved this by running: keytool -import -trustcacerts ..." }]
+  Verdict: keep — original question describes a PKIX failure; reply provides concrete keytool
+  steps. Certificate trust for K8s monitoring is a recurring enterprise pain point.
+
+KEEP from reply (confidence 0.80):
+  Subject: "Lambda Java cold-start timeout after DT layer initializes"
+  replyPosts: [{ body: "We fixed this by setting DT_LAMBDA_COLD_START_TIMEOUT=5000 in env vars." }]
+  Verdict: keep — original body shows a hang after OTel init; reply provides the exact env var
+  fix. The solution is actionable for anyone hitting the same Lambda cold-start issue.
 
 REVIEW (confidence 0.55):
   Subject: "Official DT recommendations for deploying via Flux or ArgoCD"
-  Verdict: review — the post body is a question with no accepted answer; unclear whether the
-  described deployment pattern is still valid or has been superseded by a different approach.
+  replyPosts: [{ body: "I'd also like to know this." }]
+  Verdict: review — the post body is a question with no accepted answer; the only reply is a
+  "me too". Unclear whether the described deployment pattern is still valid.
 ```
 
 ---
