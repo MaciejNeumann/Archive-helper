@@ -243,7 +243,13 @@ const renderLlmCoverage = (posts) => {
   const pct = Math.round((withVerdict.length / analyzed.length) * 100);
   const disagreements = withVerdict.filter(llmDisagreesWithStars).length;
   const counts = withVerdict.reduce((a, p) => { a[p.llmVerdict] = (a[p.llmVerdict] || 0) + 1; return a; }, {});
-  const parts = ['archive', 'keep', 'review'].filter((v) => counts[v]).map((v) => `${counts[v]} ${v}`);
+  const reviewTotal = (counts['review'] || 0) + (counts['review:stale'] || 0) + (counts['review:uncertain'] || 0);
+  const reviewDetail = [counts['review:stale'] && `${counts['review:stale']} stale`, counts['review:uncertain'] && `${counts['review:uncertain']} uncertain`].filter(Boolean).join(', ');
+  const parts = [
+    counts['archive'] && `${counts['archive']} archive`,
+    counts['keep'] && `${counts['keep']} keep`,
+    reviewTotal && `${reviewTotal} review${reviewDetail ? ` (${reviewDetail})` : ''}`,
+  ].filter(Boolean);
   el.innerHTML = `LLM review: <strong>${withVerdict.length} / ${analyzed.length} posts</strong> (${pct}%) — ${parts.join(' · ')}${disagreements ? ` · <span class="llm-coverage-disagree">${disagreements} disagree with ★ score</span>` : ''}`;
   el.hidden = false;
 };
@@ -263,6 +269,7 @@ const filteredSortedPosts = () => {
   if (minStars > 0) rows = rows.filter((p) => p.stars >= minStars);
   if (llmVerdict === 'none') rows = rows.filter((p) => !p.llmVerdict);
   else if (llmVerdict === 'disagree') rows = rows.filter(llmDisagreesWithStars);
+  else if (llmVerdict === 'review') rows = rows.filter((p) => p.llmVerdict === 'review' || p.llmVerdict === 'review:stale' || p.llmVerdict === 'review:uncertain');
   else if (llmVerdict) rows = rows.filter((p) => p.llmVerdict === llmVerdict);
   if (needle) {
     rows = rows.filter((p) => {
@@ -350,11 +357,12 @@ const renderOverlapCell = (post) => {
   `;
 };
 
-const LLM_VERDICT_LABEL = { archive: 'Archive', keep: 'Keep', review: 'Needs review' };
+const LLM_VERDICT_LABEL = { archive: 'Archive', keep: 'Keep', review: 'Needs review', 'review:stale': 'Stale answer', 'review:uncertain': 'Uncertain' };
 
 const renderLlmCell = (post) => {
   if (!post.llmVerdict) return '<span class="muted">—</span>';
   const verdict = post.llmVerdict;
+  const cssVerdict = verdict.replace(':', '-');
   const label = LLM_VERDICT_LABEL[verdict] || verdict;
   const disagrees = llmDisagreesWithStars(post);
   const disagreeBadge = disagrees
@@ -363,7 +371,7 @@ const renderLlmCell = (post) => {
   const pct = typeof post.llmConfidence === 'number' ? Math.round(post.llmConfidence * 100) : null;
   const confBar = pct !== null ? `
     <div class="llm-conf-row">
-      <div class="llm-conf-bar"><span class="llm-conf-fill llm-${verdict}" style="width:${pct}%"></span></div>
+      <div class="llm-conf-bar"><span class="llm-conf-fill llm-${cssVerdict}" style="width:${pct}%"></span></div>
       <span class="llm-conf">${pct}%</span>
     </div>` : '';
   const summary = post.llmSummary
@@ -371,20 +379,24 @@ const renderLlmCell = (post) => {
     : '';
   return `
     <div class="llm-cell">
-      <div class="llm-tag-row"><span class="llm-tag llm-${verdict}">${label}</span>${disagreeBadge}</div>
+      <div class="llm-tag-row"><span class="llm-tag llm-${cssVerdict}">${label}</span>${disagreeBadge}</div>
       ${confBar}
       ${summary}
     </div>
   `;
 };
 
-const renderResults = () => {
+const updateSummary = () => {
   const rows = filteredSortedPosts();
   const totalChecked = state.posts.filter((p) => p.checked).length;
   const totalArchived = state.posts.filter((p) => p.archived).length;
   const archivedPart = totalArchived > 0 ? ` · ${totalArchived} archived` : '';
   $('#resultsSummary').textContent =
     `${rows.length} shown · ${state.posts.length} total · ${totalChecked} checked${archivedPart}`;
+};
+
+const renderResults = () => {
+  updateSummary();
 
   const tbody = $('#resultsTbody');
   tbody.innerHTML = '';
@@ -492,6 +504,7 @@ const handleArchivedToggle = async (e) => {
   const post = state.posts.find((p) => p.index === idx);
   if (post) post.archived = archived;
   cb.closest('tr').classList.toggle('archived', archived);
+  updateSummary();
   try {
     const r = await fetch(`/api/sessions/${state.sessionId}/archived`, {
       method: 'PATCH',
@@ -668,7 +681,7 @@ const selectedExportScope = () =>
 const BATCH_SIZE = 30;
 const BATCH_THRESHOLD = 40;
 
-const LLM_FILTER_LABELS = { archive: 'LLM: Archive', keep: 'LLM: Keep', review: 'LLM: Review', disagree: 'LLM disagrees', none: 'No LLM verdict' };
+const LLM_FILTER_LABELS = { archive: 'LLM: Archive', keep: 'LLM: Keep', review: 'LLM: Review (all)', 'review:stale': 'LLM: Stale answer', 'review:uncertain': 'LLM: Uncertain', disagree: 'LLM disagrees', none: 'No LLM verdict' };
 
 const updateExportCount = () => {
   const scope = selectedExportScope();
