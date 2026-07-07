@@ -24,19 +24,38 @@ const handleUpload = (req, res) => {
     const { rows, errors } = parseCsv(req.file.path);
 
     // Always capture reply content as context for LLM review, regardless of includeReplies flag.
-    // Maps parentUrl → array of {author, postedAt, subject, body} for each reply.
+    // Maps parentUrl → array of {url, author, postedAt, subject, body} for each reply.
+    // url is included so getAllReplies can recurse into nested replies (replies-to-replies).
     const replyMap = {};
     rows.forEach((row) => {
       if (isOriginalThread(row)) return;
       const n = normalizeRow(row);
       if (!replyMap[n.parentUrl]) replyMap[n.parentUrl] = [];
       replyMap[n.parentUrl].push({
+        url: n.url,
         author: n.author,
         postedAt: n.postedAt ? n.postedAt.toISOString() : null,
         subject: n.subject,
         body: n.body,
       });
     });
+
+    // BFS traversal so that reply order matches reading order in the thread.
+    const getAllReplies = (rootUrl) => {
+      const result = [];
+      const queue = [rootUrl];
+      const seen = new Set();
+      while (queue.length) {
+        const url = queue.shift();
+        if (seen.has(url)) continue;
+        seen.add(url);
+        for (const reply of (replyMap[url] || [])) {
+          result.push(reply);
+          queue.push(reply.url);
+        }
+      }
+      return result;
+    };
 
     const filtered = includeReplies ? rows : rows.filter(isOriginalThread);
     const posts = filtered.map((row, idx) => {
@@ -54,7 +73,7 @@ const handleUpload = (req, res) => {
         parentUrl: n.parentUrl,
         rootUrl: n.rootUrl,
         // Reply bodies attached for LLM context; empty for reply rows themselves
-        replyPosts: isOriginalThread(row) ? (replyMap[n.url] || []) : [],
+        replyPosts: isOriginalThread(row) ? getAllReplies(n.url) : [],
         stars: null,
         rawScore: null,
         reasons: [],

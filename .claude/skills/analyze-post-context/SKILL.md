@@ -26,7 +26,7 @@ to parse); the `.csv` carries the same columns. The JSON shape is:
       "url": "...", "author": "...", "postedAt": "2021-03-04T09:12:00.000Z",
       "replies": 0, "kudos": 0,
       "replyPosts": [
-        { "author": "Jane Doe", "postedAt": "2021-03-05T10:00:00.000Z", "subject": "Re: ...", "body": "Here is how I solved it: ..." }
+        { "url": "...", "author": "Jane Doe", "postedAt": "2021-03-05T10:00:00.000Z", "subject": "Re: ...", "body": "Here is how I solved it: ..." }
       ],
       "stars": 5, "rawScore": 4, "reasons": ["Posted 4.1 years ago (>3y threshold)", "..."],
       "keywords": ["..."],
