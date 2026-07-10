@@ -157,6 +157,14 @@ Rules: emit a result for **every** post in the input. `llmVerdict` must be one o
 backward compatibility). `llmSummary` ≤160 chars (renders in a table cell).
 `llmReasoning` is 1–3 sentences (shown on hover). Keep `index` exactly as given.
 
+**`llmReasoning` must always include a sentence on technology currency** — whether the
+product/platform/feature discussed in the post is still current, actively supported, or
+deprecated/EOL. This is required in every reasoning string, not just archive verdicts.
+When `docOverlapVerdict` is `"stale"` (the rule-based scorer found little or no current
+docs/blog coverage), explicitly state whether that staleness reflects a deprecated
+technology or simply a niche topic — e.g. "The technology is current and actively
+supported but poorly covered in recent docs" vs. "AppMon is EOL and no longer documented."
+
 **2. `<base>.review-report.md`** — a prioritized report a moderator can act on:
 
 - **Summary line**: N posts reviewed · X archive · Y keep · Z review:stale · W review:uncertain
@@ -291,7 +299,7 @@ Batch {{BATCH_N}} of {{TOTAL_BATCHES}} — posts {{BATCH_START}}–{{BATCH_END}}
     "llmVerdict": "archive" | "keep" | "review:stale" | "review:uncertain",
     "llmConfidence": <0.0–1.0>,
     "llmSummary": "<one sentence ≤160 chars — renders in a table cell>",
-    "llmReasoning": "<1–3 sentences — shown on hover>"
+    "llmReasoning": "<1–3 sentences — shown on hover. Must always include a sentence on whether the technology/product/platform discussed is still current, actively supported, or deprecated/EOL. When the post's docOverlapVerdict is 'stale', explicitly state whether that staleness is because the technology is deprecated or because it's a niche topic with little doc coverage.>"
   },
   ...
 ]
