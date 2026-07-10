@@ -396,6 +396,7 @@ const updateSummary = () => {
 };
 
 const renderResults = () => {
+  const rows = filteredSortedPosts();
   updateSummary();
 
   const tbody = $('#resultsTbody');
