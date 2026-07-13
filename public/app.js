@@ -226,6 +226,7 @@ const loadResults = async (sessionId) => {
   $('#progressSection').hidden = true;
   $('#resultsSection').hidden = false;
   $('#newCsvBtn').hidden = false;
+  $('#topSaveBtn').hidden = false;
   $('#resultsTitle').textContent = `Results · ${data.sourceFile || ''}`;
   $('#sessionNameInput').value = state.sessionName;
   renderLlmCoverage(data.posts);
@@ -270,6 +271,7 @@ const filteredSortedPosts = () => {
   if (llmVerdict === 'none') rows = rows.filter((p) => !p.llmVerdict);
   else if (llmVerdict === 'disagree') rows = rows.filter(llmDisagreesWithStars);
   else if (llmVerdict === 'review') rows = rows.filter((p) => p.llmVerdict === 'review' || p.llmVerdict === 'review:stale' || p.llmVerdict === 'review:uncertain');
+  else if (llmVerdict.startsWith('stale:')) { const st = llmVerdict.slice(6); rows = rows.filter((p) => p.llmVerdict === 'review:stale' && p.llmStaleType === st); }
   else if (llmVerdict) rows = rows.filter((p) => p.llmVerdict === llmVerdict);
   if (needle) {
     rows = rows.filter((p) => {
@@ -358,6 +360,7 @@ const renderOverlapCell = (post) => {
 };
 
 const LLM_VERDICT_LABEL = { archive: 'Archive', keep: 'Keep', review: 'Needs review', 'review:stale': 'Stale answer', 'review:uncertain': 'Uncertain' };
+const STALE_TYPE_LABELS = { 'api-version': 'Old API', 'ui-path': 'Old UI path', 'coming-soon': 'Coming soon', 'not-possible': 'Not possible', 'pricing': 'Pricing/licensing', 'general': 'General staleness' };
 
 const renderLlmCell = (post) => {
   if (!post.llmVerdict) return '<span class="muted">—</span>';
@@ -367,6 +370,9 @@ const renderLlmCell = (post) => {
   const disagrees = llmDisagreesWithStars(post);
   const disagreeBadge = disagrees
     ? `<span class="llm-disagree-badge" title="LLM verdict disagrees with rule-based star score">⚡</span>`
+    : '';
+  const staleChip = verdict === 'review:stale' && post.llmStaleType
+    ? `<span class="llm-stale-chip llm-stale-${post.llmStaleType}">${STALE_TYPE_LABELS[post.llmStaleType] || post.llmStaleType}</span>`
     : '';
   const pct = typeof post.llmConfidence === 'number' ? Math.round(post.llmConfidence * 100) : null;
   const confBar = pct !== null ? `
@@ -382,7 +388,7 @@ const renderLlmCell = (post) => {
     : '';
   return `
     <div class="llm-cell">
-      <div class="llm-tag-row"><span class="llm-tag llm-${cssVerdict}">${label}</span>${disagreeBadge}</div>
+      <div class="llm-tag-row"><span class="llm-tag llm-${cssVerdict}">${label}</span>${disagreeBadge}${staleChip}</div>
       ${confBar}
       ${summary}
       ${reasoning}
@@ -397,6 +403,16 @@ const updateSummary = () => {
   const archivedPart = totalArchived > 0 ? ` · ${totalArchived} archived` : '';
   $('#resultsSummary').textContent =
     `${rows.length} shown · ${state.posts.length} total · ${totalChecked} checked${archivedPart}`;
+
+  const footer = $('#tableFooter');
+  if (rows.length === 0) { footer.hidden = true; return; }
+  const viewChecked = rows.filter((p) => p.checked).length;
+  const viewArchived = rows.filter((p) => p.archived).length;
+  const archivedChip = viewArchived > 0
+    ? `<span class="footer-chip footer-archived">${viewArchived} archived</span>`
+    : '';
+  footer.innerHTML = `<span class="footer-chip footer-checked">${viewChecked} / ${rows.length} reviewed</span>${archivedChip}`;
+  footer.hidden = false;
 };
 
 const renderResults = () => {
@@ -686,7 +702,7 @@ const selectedExportScope = () =>
 const BATCH_SIZE = 30;
 const BATCH_THRESHOLD = 40;
 
-const LLM_FILTER_LABELS = { archive: 'LLM: Archive', keep: 'LLM: Keep', review: 'LLM: Review (all)', 'review:stale': 'LLM: Stale answer', 'review:uncertain': 'LLM: Uncertain', disagree: 'LLM disagrees', none: 'No LLM verdict' };
+const LLM_FILTER_LABELS = { archive: 'LLM: Archive', keep: 'LLM: Keep', review: 'LLM: Review (all)', 'review:stale': 'LLM: Stale answer', 'review:uncertain': 'LLM: Uncertain', disagree: 'LLM disagrees', none: 'No LLM verdict', 'stale:api-version': 'Stale: Old API version', 'stale:ui-path': 'Stale: Old UI path', 'stale:coming-soon': 'Stale: "Coming soon"', 'stale:not-possible': 'Stale: "Not possible"', 'stale:pricing': 'Stale: Pricing/licensing', 'stale:general': 'Stale: General' };
 
 const updateExportCount = () => {
   const scope = selectedExportScope();
@@ -829,6 +845,7 @@ const handleNewCsv = () => {
   $('#progressSection').hidden = true;
   $('#uploadSection').hidden = false;
   $('#newCsvBtn').hidden = true;
+  $('#topSaveBtn').hidden = true;
 };
 
 const handleRefreshCache = async () => {
@@ -857,6 +874,7 @@ const init = () => {
   $('#sessionsList').addEventListener('click', handleSessionsClick);
   $('#clearAllSessionsBtn').addEventListener('click', handleClearAllSessions);
   $('#saveSessionBtn').addEventListener('click', handleSaveSession);
+  $('#topSaveBtn').addEventListener('click', handleSaveSession);
   $('#refreshCacheBtn').addEventListener('click', handleRefreshCache);
   $('#exportBtn').addEventListener('click', openExportDialog);
   $('#exportConfirmBtn').addEventListener('click', handleExportConfirm);

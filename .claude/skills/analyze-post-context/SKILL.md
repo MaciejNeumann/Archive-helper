@@ -147,6 +147,14 @@ narrow topic → keep the best, archive the rest).
       "llmConfidence": 0.9,
       "llmSummary": "Resolved AppMon 6 agent-install question; product retired, no lasting value.",
       "llmReasoning": "Body is a one-off install error for AppMon 6.5, answered inline in 2019. AppMon is EOL and superseded by Dynatrace SaaS; nothing here applies to current agents."
+    },
+    {
+      "index": 7,
+      "llmVerdict": "review:stale",
+      "llmConfidence": 0.72,
+      "llmSummary": "Valid question about querying synthetic data, but reply references the deprecated v1 Timeseries API.",
+      "llmReasoning": "The topic (querying synthetic availability data) is a current ongoing need. The answer uses GET /api/v1/timeseries which was superseded by Metrics v2; a moderator should verify against current API docs. Dynatrace Synthetic Monitoring is actively supported.",
+      "llmStaleType": "api-version"
     }
   ]
 }
@@ -156,6 +164,15 @@ Rules: emit a result for **every** post in the input. `llmVerdict` must be one o
 `archive` / `keep` / `review:stale` / `review:uncertain` (bare `review` is also accepted for
 backward compatibility). `llmSummary` ≤160 chars (renders in a table cell).
 `llmReasoning` is 1–3 sentences (shown on hover). Keep `index` exactly as given.
+
+**`llmStaleType`** — required when `llmVerdict` is `review:stale`; omit for all other verdicts.
+Pick the single best-fitting type:
+- `api-version` — reply references a deprecated or superseded API version (e.g. v1 endpoint, old Timeseries API)
+- `ui-path` — reply describes a UI navigation path or menu that has since changed
+- `coming-soon` — reply says "coming soon", "in development", or "not yet available" for a feature that has since shipped
+- `not-possible` — reply says "not possible" or "not supported" for something that may have been added in the last 3+ years
+- `pricing` — reply cites pricing, licensing figures, or SKU names from 3+ years ago
+- `general` — stale for other reasons (version-specific behavior, outdated config syntax, etc.)
 
 **`llmReasoning` must always include a sentence on technology currency** — whether the
 product/platform/feature discussed in the post is still current, actively supported, or
@@ -299,12 +316,13 @@ Batch {{BATCH_N}} of {{TOTAL_BATCHES}} — posts {{BATCH_START}}–{{BATCH_END}}
     "llmVerdict": "archive" | "keep" | "review:stale" | "review:uncertain",
     "llmConfidence": <0.0–1.0>,
     "llmSummary": "<one sentence ≤160 chars — renders in a table cell>",
-    "llmReasoning": "<1–3 sentences — shown on hover. Must always include a sentence on whether the technology/product/platform discussed is still current, actively supported, or deprecated/EOL. When the post's docOverlapVerdict is 'stale', explicitly state whether that staleness is because the technology is deprecated or because it's a niche topic with little doc coverage.>"
+    "llmReasoning": "<1–3 sentences — shown on hover. Must always include a sentence on whether the technology/product/platform discussed is still current, actively supported, or deprecated/EOL. When the post's docOverlapVerdict is 'stale', explicitly state whether that staleness is because the technology is deprecated or because it's a niche topic with little doc coverage.>",
+    "llmStaleType": "<only when llmVerdict is 'review:stale' — one of: api-version | ui-path | coming-soon | not-possible | pricing | general>"
   },
   ...
 ]
 
-Emit one object per post. Do not skip any post.
+Emit one object per post. Do not skip any post. Omit `llmStaleType` entirely for non-stale verdicts.
 
 ## Default posture
 

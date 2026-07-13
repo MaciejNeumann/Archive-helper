@@ -17,6 +17,7 @@
     <button id="newCsvBtn" class="ghost-btn" hidden>New CSV</button>
     <button id="loadSessionBtn" class="ghost-btn">Sessions</button>
     <button id="refreshCacheBtn" class="ghost-btn" title="Refresh the cached crawl of Docs &amp; Blog">Refresh docs cache</button>
+    <button id="topSaveBtn" class="primary-btn top-save-btn" hidden>Save session</button>
   </nav>
 </header>
 
@@ -91,7 +92,15 @@
           <option value="archive">LLM: Archive</option>
           <option value="keep">LLM: Keep</option>
           <option value="review">LLM: Review (all)</option>
-          <option value="review:stale">LLM: Stale answer</option>
+          <option value="review:stale">LLM: Stale answer (all)</option>
+          <optgroup label="Stale answer — by type">
+            <option value="stale:api-version">↳ Old API version</option>
+            <option value="stale:ui-path">↳ Old UI path</option>
+            <option value="stale:coming-soon">↳ "Coming soon" answer</option>
+            <option value="stale:not-possible">↳ "Not possible" answer</option>
+            <option value="stale:pricing">↳ Pricing / licensing</option>
+            <option value="stale:general">↳ General staleness</option>
+          </optgroup>
           <option value="review:uncertain">LLM: Uncertain</option>
           <option value="disagree">LLM disagrees</option>
           <option value="none">No LLM verdict</option>
@@ -124,6 +133,7 @@
         <tbody id="resultsTbody"></tbody>
       </table>
     </div>
+    <div id="tableFooter" class="table-footer" hidden></div>
   </section>
 </main>
 
