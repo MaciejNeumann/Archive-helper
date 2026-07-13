@@ -371,8 +371,9 @@ const renderLlmCell = (post) => {
   const disagreeBadge = disagrees
     ? `<span class="llm-disagree-badge" title="LLM verdict disagrees with rule-based star score">⚡</span>`
     : '';
-  const staleChip = verdict === 'review:stale' && post.llmStaleType
-    ? `<span class="llm-stale-chip llm-stale-${post.llmStaleType}">${STALE_TYPE_LABELS[post.llmStaleType] || post.llmStaleType}</span>`
+  const staleLabel = STALE_TYPE_LABELS[post.llmStaleType];
+  const staleChip = verdict === 'review:stale' && staleLabel
+    ? `<span class="llm-stale-chip llm-stale-${post.llmStaleType}">${staleLabel}</span>`
     : '';
   const pct = typeof post.llmConfidence === 'number' ? Math.round(post.llmConfidence * 100) : null;
   const confBar = pct !== null ? `
@@ -396,8 +397,7 @@ const renderLlmCell = (post) => {
   `;
 };
 
-const updateSummary = () => {
-  const rows = filteredSortedPosts();
+const updateSummary = (rows = filteredSortedPosts()) => {
   const totalChecked = state.posts.filter((p) => p.checked).length;
   const totalArchived = state.posts.filter((p) => p.archived).length;
   const archivedPart = totalArchived > 0 ? ` · ${totalArchived} archived` : '';
@@ -417,7 +417,7 @@ const updateSummary = () => {
 
 const renderResults = () => {
   const rows = filteredSortedPosts();
-  updateSummary();
+  updateSummary(rows);
 
   const tbody = $('#resultsTbody');
   tbody.innerHTML = '';
