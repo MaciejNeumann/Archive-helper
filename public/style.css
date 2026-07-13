@@ -360,7 +360,7 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
 .col-num     { width: 60px; text-align: center; }
 .col-overlap { width: 172px; }
 .col-why     { width: 172px; }
-.col-llm     { width: 150px; }
+.col-llm     { width: 200px; }
 .sortable { cursor: pointer; user-select: none; }
 .sortable.active { color: var(--dt-blue-dark); }
 
@@ -446,7 +446,7 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
 .llm-conf-fill.llm-review-uncertain { background: #6b7280; }
 .llm-conf { font-size: 11px; font-weight: 600; color: var(--dt-ink-soft); white-space: nowrap; }
 .llm-summary { color: var(--dt-ink-soft); line-height: 1.35; }
-.llm-reasoning { margin-top: 4px; font-size: 11px; color: var(--dt-ink-soft); line-height: 1.45; opacity: 0.85; max-height: 7em; overflow-y: auto; }
+.llm-reasoning { margin-top: 4px; font-size: 11px; color: var(--dt-ink-soft); line-height: 1.45; opacity: 0.85; }
 .llm-stale-chip { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-left: 5px; letter-spacing: 0.02em; vertical-align: middle; }
 .llm-stale-api-version  { background: #dbeafe; color: #1d4ed8; }
 .llm-stale-ui-path      { background: #ede9fe; color: #6d28d9; }
@@ -630,7 +630,7 @@ input.archived-box:active { transform: scale(1.35); }
 
 /* ---- Review mode — hide meta columns ---- */
 .results-table.review-mode .col-meta { display: none; }
-.results-table.review-mode .col-llm  { width: 220px; }
+.results-table.review-mode .col-llm  { width: 300px; }
 .results-table.review-mode .col-why  { width: 200px; }
 
 /* ---- Row accent — colored left edge per LLM verdict ---- */
