@@ -505,6 +505,7 @@ const handleCheckboxToggle = async (e) => {
   const post = state.posts.find((p) => p.index === idx);
   if (post) post.checked = checked;
   cb.closest('tr').classList.toggle('checked', checked);
+  updateSummary();
   try {
     const r = await fetch(`/api/sessions/${state.sessionId}/checked`, {
       method: 'PATCH',
