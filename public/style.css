@@ -447,6 +447,9 @@ dialog .ghost-btn:hover { background: var(--dt-line-soft); }
 .llm-conf { font-size: 11px; font-weight: 600; color: var(--dt-ink-soft); white-space: nowrap; }
 .llm-summary { color: var(--dt-ink-soft); line-height: 1.35; }
 .llm-reasoning { margin-top: 4px; font-size: 11px; color: var(--dt-ink-soft); line-height: 1.45; opacity: 0.85; }
+.llm-hl-archive { color: var(--dt-red); font-weight: 600; font-style: normal; }
+.llm-hl-keep    { color: var(--dt-green); font-weight: 600; font-style: normal; }
+.llm-hl-stale   { color: #e07a25; font-weight: 600; font-style: normal; }
 .llm-stale-chip { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-left: 5px; letter-spacing: 0.02em; vertical-align: middle; }
 .llm-stale-api-version  { background: #dbeafe; color: #1d4ed8; }
 .llm-stale-ui-path      { background: #ede9fe; color: #6d28d9; }

@@ -362,6 +362,29 @@ const renderOverlapCell = (post) => {
 const LLM_VERDICT_LABEL = { archive: 'Archive', keep: 'Keep', review: 'Needs review', 'review:stale': 'Stale answer', 'review:uncertain': 'Uncertain' };
 const STALE_TYPE_LABELS = { 'api-version': 'Old API', 'ui-path': 'Old UI path', 'coming-soon': 'Coming soon', 'not-possible': 'Not possible', 'pricing': 'Pricing/licensing', 'general': 'General staleness' };
 
+const highlightLlmText = (() => {
+  const phrases = [
+    // archive signals
+    ...['no longer supported', 'no longer available', 'no longer documented', 'no longer maintained',
+        'end-of-life', 'end of life', 'deprecated', 'deprecation', 'retired', 'retirement',
+        'discontinued', 'obsolete', 'appmon', 'ruxit', 'easytravel', 'cloud foundry', 'classic ui', 'pcf',
+    ].map(w => ({ w, cls: 'archive' })),
+    // keep signals
+    ...['actively supported', 'actively documented', 'currently supported', 'still supported',
+        'still valid', 'still current', 'still useful', 'still relevant', 'still applies',
+        'working solution', 'concrete steps', 'recurring',
+    ].map(w => ({ w, cls: 'keep' })),
+    // stale signals
+    ...['may be wrong', 'may mislead', 'may no longer', 'out of date', 'out-of-date',
+        'no longer accurate', 'needs verification', 'needs updating',
+    ].map(w => ({ w, cls: 'stale' })),
+  ].sort((a, b) => b.w.length - a.w.length);
+
+  const map = Object.fromEntries(phrases.map(({ w, cls }) => [w, cls]));
+  const re = new RegExp(phrases.map(({ w }) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi');
+  return (escaped) => escaped.replace(re, (m) => `<strong class="llm-hl-${map[m.toLowerCase()]}">${m}</strong>`);
+})();
+
 const renderLlmCell = (post) => {
   if (!post.llmVerdict) return '<span class="muted">—</span>';
   const verdict = post.llmVerdict;
@@ -382,10 +405,10 @@ const renderLlmCell = (post) => {
       <span class="llm-conf">${pct}%</span>
     </div>` : '';
   const summary = post.llmSummary
-    ? `<div class="llm-summary">${escapeHtml(post.llmSummary)}</div>`
+    ? `<div class="llm-summary">${highlightLlmText(escapeHtml(post.llmSummary))}</div>`
     : '';
   const reasoning = post.llmReasoning
-    ? `<div class="llm-reasoning">${escapeHtml(post.llmReasoning)}</div>`
+    ? `<div class="llm-reasoning">${highlightLlmText(escapeHtml(post.llmReasoning))}</div>`
     : '';
   return `
     <div class="llm-cell">
