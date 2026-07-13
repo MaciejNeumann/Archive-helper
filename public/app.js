@@ -375,13 +375,17 @@ const renderLlmCell = (post) => {
       <span class="llm-conf">${pct}%</span>
     </div>` : '';
   const summary = post.llmSummary
-    ? `<div class="llm-summary" title="${escapeHtml(post.llmReasoning || '')}">${escapeHtml(shorten(post.llmSummary, 160))}</div>`
+    ? `<div class="llm-summary">${escapeHtml(post.llmSummary)}</div>`
+    : '';
+  const reasoning = post.llmReasoning
+    ? `<div class="llm-reasoning">${escapeHtml(post.llmReasoning)}</div>`
     : '';
   return `
     <div class="llm-cell">
       <div class="llm-tag-row"><span class="llm-tag llm-${cssVerdict}">${label}</span>${disagreeBadge}</div>
       ${confBar}
       ${summary}
+      ${reasoning}
     </div>
   `;
 };
