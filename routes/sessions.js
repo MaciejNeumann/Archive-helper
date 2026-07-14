@@ -37,6 +37,7 @@ router.get('/:id', requireValidId, (req, res) => {
 router.post('/:id/save', requireValidId, async (req, res) => {
   const data = loadSession(req.params.id);
   if (!data) return res.status(404).json({ error: 'Session not found' });
+  if (req.body && req.body.viewState) data.viewState = req.body.viewState;
   try {
     const saved = await saveSession(data);
     res.json(saved);

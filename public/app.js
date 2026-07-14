@@ -223,6 +223,18 @@ const loadResults = async (sessionId) => {
   state.sessionName = data.name || '';
   state.posts = data.posts;
   state.sourceFile = data.sourceFile || '';
+
+  if (data.viewState) {
+    state.filter = { text: '', minStars: 0, llmVerdict: '', ...(data.viewState.filter || {}) };
+    state.sort = { key: 'stars', dir: 'desc', ...(data.viewState.sort || {}) };
+  } else {
+    state.filter = { text: '', minStars: 0, llmVerdict: '' };
+    state.sort = { key: 'stars', dir: 'desc' };
+  }
+  $('#searchBox').value = state.filter.text || '';
+  $('#starFilter').value = String(state.filter.minStars || 0);
+  $('#llmFilter').value = state.filter.llmVerdict || '';
+
   $('#progressSection').hidden = true;
   $('#resultsSection').hidden = false;
   $('#newCsvBtn').hidden = false;
@@ -842,7 +854,6 @@ const handleSessionsClick = async (e) => {
   const { action, id } = btn.dataset;
   if (action === 'load') {
     $('#sessionsDialog').close();
-    resetFilters();
     await loadResults(id);
     $('#uploadSection').hidden = true;
     $('#progressSection').hidden = true;
@@ -858,7 +869,12 @@ const handleSessionsClick = async (e) => {
 
 const handleSaveSession = async () => {
   if (!state.sessionId) return;
-  const r = await fetch(`/api/sessions/${state.sessionId}/save`, { method: 'POST' });
+  const viewState = { filter: { ...state.filter }, sort: { ...state.sort } };
+  const r = await fetch(`/api/sessions/${state.sessionId}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ viewState }),
+  });
   if (r.ok) showToast('Session saved'); else showToast('Save failed', true);
 };
 
