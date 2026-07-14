@@ -375,44 +375,68 @@ const LLM_VERDICT_LABEL = { archive: 'Archive', keep: 'Keep', review: 'Needs rev
 const STALE_TYPE_LABELS = { 'api-version': 'Old API', 'ui-path': 'Old UI path', 'coming-soon': 'Coming soon', 'not-possible': 'Not possible', 'pricing': 'Pricing/licensing', 'general': 'General staleness' };
 
 const highlightLlmText = (() => {
-  const phrases = [
-    // archive signals
-    ...['no longer supported', 'no longer available', 'no longer documented', 'no longer maintained',
-        'no longer relevant', 'no longer valid', 'no longer in use', 'no longer exists',
-        'not supported', 'not available', 'not documented',
-        'end-of-life', 'end of life', 'end of support',
-        'deprecated', 'deprecation', 'retired', 'retirement',
-        'discontinued', 'obsolete', 'superseded', 'replaced by', 'phased out',
-        'decommissioned', 'removed', 'sunset', 'sunsetted',
-        'legacy', 'outdated', 'old version', 'older version',
-        'appmon', 'ruxit', 'easytravel', 'cloud foundry', 'classic ui', 'pcf',
-        'dynatrace 6', 'dynatrace 7',
-    ].map(w => ({ w, cls: 'archive' })),
-    // keep signals
-    ...['actively supported', 'actively documented', 'actively maintained',
-        'currently supported', 'currently documented',
-        'still supported', 'still valid', 'still current', 'still useful',
-        'still relevant', 'still applies', 'still accurate', 'still correct', 'still works',
-        'working solution', 'concrete steps', 'recurring',
-        'best practice', 'recommended approach', 'up to date', 'up-to-date',
-        'well documented', 'well-documented', 'frequently asked', 'common question',
-        'valuable resource', 'evergreen',
-    ].map(w => ({ w, cls: 'keep' })),
-    // stale signals
-    ...['may be wrong', 'may mislead', 'may no longer', 'may have changed', 'may be outdated',
-        'may not apply', 'may not be accurate',
-        'might have changed', 'might be outdated',
-        'could be outdated',
-        'possibly outdated', 'likely outdated', 'probably outdated',
-        'out of date', 'out-of-date',
-        'no longer accurate', 'needs verification', 'needs updating',
-        'worth verifying', 'should be verified', 'unclear if', 'uncertain whether',
-    ].map(w => ({ w, cls: 'stale' })),
-  ].sort((a, b) => b.w.length - a.w.length);
+  const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const byLenDesc = (a, b) => b.length - a.length;
 
-  const map = Object.fromEntries(phrases.map(({ w, cls }) => [w, cls]));
-  const re = new RegExp(phrases.map(({ w }) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi');
-  return (escaped) => escaped.replace(re, (m) => `<strong class="llm-hl-${map[m.toLowerCase()]}">${m}</strong>`);
+  const archiveList = [
+    'no longer supported', 'no longer available', 'no longer documented', 'no longer maintained',
+    'no longer relevant', 'no longer valid', 'no longer in use', 'no longer exists',
+    'not supported', 'not available', 'not documented',
+    'end-of-life', 'end of life', 'end of support',
+    'deprecated', 'deprecation', 'retired', 'retirement',
+    'discontinued', 'obsolete', 'superseded', 'replaced by', 'phased out',
+    'decommissioned', 'removed', 'sunset', 'sunsetted',
+    'legacy', 'outdated', 'old version', 'older version',
+    'appmon', 'ruxit', 'easytravel', 'cloud foundry', 'classic ui', 'pcf',
+    'dynatrace 6', 'dynatrace 7',
+  ];
+
+  const keepList = [
+    'actively supported', 'actively documented', 'actively maintained',
+    'currently supported', 'currently documented',
+    'still supported', 'still valid', 'still current', 'still useful',
+    'still relevant', 'still applies', 'still accurate', 'still correct', 'still works',
+    'working solution', 'concrete steps', 'recurring',
+    'best practice', 'recommended approach', 'up to date', 'up-to-date',
+    'well documented', 'well-documented', 'frequently asked', 'common question',
+    'valuable resource', 'evergreen',
+  ];
+
+  const staleList = [
+    'may be wrong', 'may mislead', 'may no longer', 'may have changed', 'may be outdated',
+    'may not apply', 'may not be accurate',
+    'might have changed', 'might be outdated',
+    'could be outdated',
+    'possibly outdated', 'likely outdated', 'probably outdated',
+    'out of date', 'out-of-date',
+    'no longer accurate', 'needs verification', 'needs updating',
+    'worth verifying', 'should be verified', 'unclear if', 'uncertain whether',
+  ];
+
+  // Negation words that flip an archive signal to a keep signal ("not deprecated" → green)
+  const negations = ['not', 'never', "isn't", "aren't", "wasn't", "weren't", "doesn't", "hasn't", 'no longer'];
+  const negPfx = `(?:${negations.map(esc).join('|')})\\s+`;
+
+  const archivePat = [...archiveList].sort(byLenDesc).map(esc).join('|');
+  const keepPat = [...keepList].sort(byLenDesc).map(esc).join('|');
+  const stalePat = [...staleList].sort(byLenDesc).map(esc).join('|');
+
+  // Each entry is [pattern, cssClass]. The regex tries alternatives left-to-right, so
+  // negated archive must come before plain archive to win when both could match.
+  const entries = [
+    [`${negPfx}(?:${archivePat})`, 'keep'],
+    [archivePat, 'archive'],
+    [keepPat, 'keep'],
+    [stalePat, 'stale'],
+  ];
+
+  const re = new RegExp(entries.map(([p]) => `(${p})`).join('|'), 'gi');
+  const classes = entries.map(([, c]) => c);
+
+  return (escaped) => escaped.replace(re, (...args) => {
+    const groupIdx = args.slice(1, classes.length + 1).findIndex((g) => g !== undefined);
+    return `<strong class="llm-hl-${classes[groupIdx]}">${args[0]}</strong>`;
+  });
 })();
 
 const renderLlmCell = (post) => {
