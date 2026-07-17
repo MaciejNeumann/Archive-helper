@@ -823,6 +823,298 @@ const handleExportConfirm = () => {
   showToast(`Exported ${posts.length} posts (CSV + JSON)`);
 };
 
+// ------------------------- HTML Snapshot Export -------------------------
+const buildHtml = async (posts, scope) => {
+  const cssText = await fetch('/style.css').then((r) => r.text());
+  const sessionLabel = state.sessionName || state.sourceFile || 'Archive Review';
+  const exportDate = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  const hasLlm = posts.some((p) => p.llmVerdict);
+
+  const renderHtmlRow = (post) => {
+    const reasons = (post.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('');
+    const kwScores = post.keywordScores || {};
+    const keywords = (post.keywords || []).slice(0, 8)
+      .map((k) => {
+        const s = kwScores[k];
+        const badge = s != null ? `<span class="kw-score">${s}</span>` : '';
+        return `<span class="kw-chip">${escapeHtml(k)}${badge}</span>`;
+      }).join('');
+    const searchBlob = escapeHtml(`${post.subject} ${post.author} ${(post.keywords || []).join(' ')}`);
+    const trClass = [post.checked ? 'checked' : '', post.archived ? 'archived' : ''].filter(Boolean).join(' ');
+    const llmTd = hasLlm ? `<td class="col-llm">${renderLlmCell(post)}</td>` : '';
+    return `<tr${trClass ? ` class="${trClass}"` : ''}
+      data-idx="${post.index}"
+      data-stars="${post.stars || 1}"
+      data-raw-score="${post.rawScore ?? 0}"
+      data-date="${post.postedAt || ''}"
+      data-replies="${post.replies ?? 0}"
+      data-kudos="${post.kudos ?? 0}"
+      data-subject="${escapeHtml(post.subject || '')}"
+      data-author="${escapeHtml(post.author || '')}"
+      data-overlap="${post.docOverlapMatched ?? 0}"
+      data-llm-verdict="${escapeHtml(post.llmVerdict || '')}"
+      data-llm-stale-type="${escapeHtml(post.llmStaleType || '')}"
+      data-search-blob="${searchBlob}">
+      <td class="col-checked"><input type="checkbox" class="checked-box"${post.checked ? ' checked' : ''} data-idx="${post.index}" /></td>
+      <td class="col-archived"><input type="checkbox" class="archived-box"${post.archived ? ' checked' : ''} data-idx="${post.index}" /></td>
+      <td class="col-stars" data-stars="${post.stars || 1}">
+        <div class="score-cell">${renderStars(post.stars || 1)}<span class="raw">raw score ${post.rawScore ?? 0}</span></div>
+      </td>
+      ${llmTd}
+      <td class="col-subject">
+        <a class="post-link" href="${escapeHtml(post.url)}" target="_blank" rel="noopener">${escapeHtml(post.subject || '(no subject)')}</a>
+        <div class="post-snippet">${escapeHtml(shorten(post.body, 160))}</div>
+        ${keywords ? `<div class="post-keywords">${keywords}</div>` : ''}
+      </td>
+      <td class="col-overlap">${renderOverlapCell(post)}</td>
+      <td class="col-why">${reasons ? `<ul class="why-list">${reasons}</ul>` : '<span class="muted">No archive signals.</span>'}</td>
+      <td class="col-author col-meta">${escapeHtml(post.author || '—')}</td>
+      <td class="col-date col-meta">${formatDate(post.postedAt)}</td>
+      <td class="col-num col-meta">${renderNumCell(post.replies)}</td>
+      <td class="col-num col-meta">${renderNumCell(post.kudos)}</td>
+    </tr>`;
+  };
+
+  const tbodyHtml = posts.map(renderHtmlRow).join('\n');
+  const archivedThSvg = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px"><rect x="1.5" y="5" width="13" height="9" rx="1.5"/><path d="M1.5 5h13" stroke-width="1.2"/><path d="M1 3h14" stroke-linecap="round"/><path d="M6 8.5h4" stroke-linecap="round"/></svg>`;
+  const llmThHtml = hasLlm ? `<th class="col-llm sortable" data-sort="llmVerdict">LLM review</th>` : '';
+  const llmFilterHtml = hasLlm ? `<select id="llmFilter" class="select">
+    <option value="">All LLM verdicts</option>
+    <option value="archive">LLM: Archive</option>
+    <option value="keep">LLM: Keep</option>
+    <option value="review">LLM: Review (all)</option>
+    <option value="review:stale">LLM: Stale answer</option>
+    <option value="review:uncertain">LLM: Uncertain</option>
+    <option value="disagree">LLM disagrees</option>
+    <option value="none">No LLM verdict</option>
+  </select>` : '';
+
+  const standaloneJs = `(function () {
+  var SESSION_ID = ${JSON.stringify(state.sessionId)};
+  var sortKey = 'stars', sortDir = 'desc';
+  var filterText = '', filterMinStars = 0, filterLlmVerdict = '';
+  var tableMode = localStorage.getItem('dt-snapshot-mode') || 'review';
+
+  var $ = function(sel) { return document.querySelector(sel); };
+  var $$ = function(sel) { return document.querySelectorAll(sel); };
+  var tbody = document.getElementById('resultsTbody');
+  var allRows = Array.from(tbody.querySelectorAll('tr'));
+
+  var SORT_KEY_TO_DATA = {
+    stars: 'rawScore', postedAt: 'date', replies: 'replies', kudos: 'kudos',
+    subject: 'subject', author: 'author', docOverlapMatched: 'overlap', llmVerdict: 'llmVerdict',
+  };
+  var NUMERIC_KEYS = new Set(['rawScore', 'replies', 'kudos', 'overlap']);
+
+  allRows.forEach(function(tr) {
+    var idx = tr.dataset.idx;
+    if (localStorage.getItem('ckd_' + SESSION_ID + '_' + idx) === '1') {
+      tr.classList.add('checked');
+      var cb = tr.querySelector('.checked-box');
+      if (cb) cb.checked = true;
+    }
+    if (localStorage.getItem('arc_' + SESSION_ID + '_' + idx) === '1') {
+      tr.classList.add('archived');
+      var cb2 = tr.querySelector('.archived-box');
+      if (cb2) cb2.checked = true;
+    }
+  });
+
+  function applyMode() {
+    var table = $('#resultsTable');
+    table.classList.toggle('review-mode', tableMode === 'review');
+    $$('.mode-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.mode === tableMode); });
+    localStorage.setItem('dt-snapshot-mode', tableMode);
+  }
+  applyMode();
+
+  function updateView() {
+    var needle = filterText.trim().toLowerCase();
+    var visible = allRows.filter(function(tr) {
+      if (filterMinStars > 0 && parseInt(tr.dataset.stars || '0') < filterMinStars) return false;
+      var v = tr.dataset.llmVerdict || '';
+      if (filterLlmVerdict) {
+        if (filterLlmVerdict === 'none') { if (v) return false; }
+        else if (filterLlmVerdict === 'review') { if (v.indexOf('review') !== 0) return false; }
+        else if (filterLlmVerdict === 'disagree') {
+          var stars = parseInt(tr.dataset.stars || '0');
+          if (!((v === 'keep' && stars >= 3) || (v === 'archive' && stars <= 2))) return false;
+        } else if (filterLlmVerdict.indexOf('stale:') === 0) {
+          var staleType = filterLlmVerdict.slice(6);
+          if (v !== 'review:stale' || tr.dataset.llmStaleType !== staleType) return false;
+        } else if (v !== filterLlmVerdict) return false;
+      }
+      if (needle && (tr.dataset.searchBlob || '').toLowerCase().indexOf(needle) === -1) return false;
+      return true;
+    });
+
+    var dataKey = SORT_KEY_TO_DATA[sortKey] || sortKey;
+    var isNum = NUMERIC_KEYS.has(dataKey);
+    var mul = sortDir === 'desc' ? -1 : 1;
+    visible.sort(function(a, b) {
+      var av = a.dataset[dataKey] || '', bv = b.dataset[dataKey] || '';
+      return isNum ? (parseFloat(av) - parseFloat(bv)) * mul : av.localeCompare(bv) * mul;
+    });
+
+    allRows.forEach(function(r) { r.hidden = true; });
+    visible.forEach(function(r) { r.hidden = false; tbody.appendChild(r); });
+
+    var checked = visible.filter(function(r) { return r.classList.contains('checked'); }).length;
+    var archived = visible.filter(function(r) { return r.classList.contains('archived'); }).length;
+    var archivedPart = archived > 0 ? ' · ' + archived + ' archived' : '';
+    $('#resultsSummary').textContent = visible.length + ' shown · ' + allRows.length + ' total · ' + checked + ' checked' + archivedPart;
+
+    $$('.sortable').forEach(function(th) {
+      var active = th.dataset.sort === sortKey;
+      th.classList.toggle('active', active);
+      if (!th.dataset.baseLabel) th.dataset.baseLabel = th.textContent.replace(/[▲▼]\s*$/, '').trim();
+      th.textContent = active ? th.dataset.baseLabel + ' ' + (sortDir === 'desc' ? '▼' : '▲') : th.dataset.baseLabel;
+    });
+  }
+
+  $('#resultsTable thead').addEventListener('click', function(e) {
+    var th = e.target.closest('.sortable');
+    if (!th) return;
+    var key = th.dataset.sort;
+    if (sortKey === key) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+    else { sortKey = key; sortDir = ['subject', 'author', 'docOverlapMatched'].indexOf(key) >= 0 ? 'asc' : 'desc'; }
+    updateView();
+  });
+
+  $('#searchBox').addEventListener('input', function(e) { filterText = e.target.value; updateView(); });
+  $('#starFilter').addEventListener('change', function(e) { filterMinStars = parseInt(e.target.value) || 0; updateView(); });
+
+  var llmEl = $('#llmFilter');
+  if (llmEl) llmEl.addEventListener('change', function(e) { filterLlmVerdict = e.target.value; updateView(); });
+
+  $('#modeToggle').addEventListener('click', function(e) {
+    var btn = e.target.closest('.mode-btn');
+    if (!btn || btn.dataset.mode === tableMode) return;
+    tableMode = btn.dataset.mode;
+    applyMode();
+  });
+
+  tbody.addEventListener('change', function(e) {
+    var cb = e.target;
+    var tr = cb.closest('tr');
+    if (!tr) return;
+    var idx = tr.dataset.idx;
+    if (cb.classList.contains('checked-box')) {
+      tr.classList.toggle('checked', cb.checked);
+      if (cb.checked) localStorage.setItem('ckd_' + SESSION_ID + '_' + idx, '1');
+      else localStorage.removeItem('ckd_' + SESSION_ID + '_' + idx);
+    } else if (cb.classList.contains('archived-box')) {
+      tr.classList.toggle('archived', cb.checked);
+      if (cb.checked) localStorage.setItem('arc_' + SESSION_ID + '_' + idx, '1');
+      else localStorage.removeItem('arc_' + SESSION_ID + '_' + idx);
+    }
+    updateView();
+  });
+
+  updateView();
+})();`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Archive Review · ${escapeHtml(sessionLabel)}</title>
+  <style>
+${cssText}
+.snapshot-badge{font-size:12px;background:var(--dt-line);color:var(--dt-ink-soft);padding:3px 10px;border-radius:20px}
+  </style>
+</head>
+<body>
+<header class="top-bar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-text">Archive Helper</span>
+    <span class="brand-sub">Dynatrace Community</span>
+  </div>
+  <nav class="top-actions">
+    <span class="snapshot-badge">Review snapshot · ${exportDate} · ${posts.length} post${posts.length === 1 ? '' : 's'}</span>
+  </nav>
+</header>
+<main>
+  <section class="card results-card">
+    <header class="results-header">
+      <div>
+        <h2>${escapeHtml(sessionLabel)}</h2>
+        <p class="muted" id="resultsSummary"></p>
+        <div class="mode-toggle" id="modeToggle" aria-label="Table view mode">
+          <button class="mode-btn" data-mode="review">Review</button>
+          <button class="mode-btn" data-mode="full">Full</button>
+        </div>
+      </div>
+      <div class="results-actions">
+        <input id="searchBox" class="search" type="search" placeholder="Filter by subject, author, keyword…" />
+        <select id="starFilter" class="select">
+          <option value="0">All stars</option>
+          <option value="5">5★ only</option>
+          <option value="4">4★ and up</option>
+          <option value="3">3★ and up</option>
+          <option value="2">2★ and up</option>
+        </select>
+        ${llmFilterHtml}
+      </div>
+    </header>
+    <div class="table-wrap">
+      <table id="resultsTable" class="results-table">
+        <thead>
+          <tr>
+            <th class="col-checked" title="Reviewed">✓</th>
+            <th class="col-archived" title="Archived in community">${archivedThSvg}</th>
+            <th class="col-stars sortable" data-sort="stars">Score</th>
+            ${llmThHtml}
+            <th class="col-subject sortable" data-sort="subject">Post</th>
+            <th class="col-overlap sortable" data-sort="docOverlapMatched" title="Number of post keywords found in docs.dynatrace.com or the Dynatrace Blog">Docs &amp; Blog overlap</th>
+            <th class="col-why">Why this score</th>
+            <th class="col-author col-meta sortable" data-sort="author">Author</th>
+            <th class="col-date col-meta sortable" data-sort="postedAt">Posted</th>
+            <th class="col-num col-meta sortable" data-sort="replies">Replies</th>
+            <th class="col-num col-meta sortable" data-sort="kudos">Kudos</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTbody">
+${tbodyHtml}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+${standaloneJs}
+</script>
+</body>
+</html>`;
+};
+
+const handleHtmlExport = async () => {
+  const scope = selectedExportScope();
+  const posts = gatherExportPosts(scope);
+  if (posts.length === 0) {
+    showToast('Nothing to export for this scope.', true);
+    return;
+  }
+  const btn = $('#exportHtmlBtn');
+  const origText = btn.textContent;
+  btn.textContent = 'Building…';
+  btn.disabled = true;
+  try {
+    const html = await buildHtml(posts, scope);
+    const base = exportBaseName(scope);
+    downloadBlob(html, `${base}.html`, 'text/html;charset=utf-8');
+    $('#exportDialog').close();
+    showToast(`Exported ${posts.length} posts as HTML snapshot`);
+  } catch (err) {
+    showToast(`HTML export failed: ${err.message}`, true);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+};
+
 const handleImportLlm = () => $('#llmImportFile').click();
 
 const handleLlmFileChosen = async (e) => {
@@ -960,6 +1252,7 @@ const init = () => {
   $('#refreshCacheBtn').addEventListener('click', handleRefreshCache);
   $('#exportBtn').addEventListener('click', openExportDialog);
   $('#exportConfirmBtn').addEventListener('click', handleExportConfirm);
+  $('#exportHtmlBtn').addEventListener('click', handleHtmlExport);
   $('#exportDialog').addEventListener('change', updateExportCount);
   $('#importLlmBtn').addEventListener('click', handleImportLlm);
   $('#llmImportFile').addEventListener('change', handleLlmFileChosen);
